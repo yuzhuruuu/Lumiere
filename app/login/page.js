@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -31,11 +31,29 @@ function SubmitButton() {
   )
 }
 
-export default function LoginPage() {
-  const [error, setError] = useState(null)
-  const [fieldErrors, setFieldErrors] = useState({})
+function SuccessMessage() {
   const searchParams = useSearchParams()
   const successMessage = searchParams.get('message')
+  
+  if (!successMessage) return null
+  
+  return (
+    <div style={{
+      padding: '0.75rem',
+      background: '#d1fae5',
+      color: '#065f46',
+      borderRadius: '6px',
+      marginBottom: '1rem',
+      fontSize: '0.875rem',
+    }}>
+      {successMessage}
+    </div>
+  )
+}
+
+function LoginForm() {
+  const [error, setError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   
   async function handleSubmit(formData) {
     setError(null)
@@ -51,6 +69,104 @@ export default function LoginPage() {
     }
   }
   
+  return (
+    <>
+      <Suspense fallback={null}>
+        <SuccessMessage />
+      </Suspense>
+      
+      {error && (
+        <div style={{
+          padding: '0.75rem',
+          background: '#fee2e2',
+          color: '#991b1b',
+          borderRadius: '6px',
+          marginBottom: '1rem',
+          fontSize: '0.875rem',
+        }}>
+          {error}
+        </div>
+      )}
+      
+      <form action={handleSubmit}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            marginBottom: '0.5rem',
+            color: '#374151',
+          }}>
+            Email
+          </label>
+          <input
+            type="email"
+            name="email"
+            placeholder="nama@email.com"
+            required
+            style={{
+              width: '100%',
+              padding: '0.625rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '1rem',
+            }}
+          />
+          {fieldErrors.email && (
+            <p style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              {fieldErrors.email[0]}
+            </p>
+          )}
+        </div>
+        
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            marginBottom: '0.5rem',
+            color: '#374151',
+          }}>
+            Password
+          </label>
+          <input
+            type="password"
+            name="password"
+            required
+            style={{
+              width: '100%',
+              padding: '0.625rem',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '1rem',
+            }}
+          />
+          {fieldErrors.password && (
+            <p style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+              {fieldErrors.password[0]}
+            </p>
+          )}
+        </div>
+        
+        <SubmitButton />
+      </form>
+      
+      <p style={{
+        textAlign: 'center',
+        marginTop: '1rem',
+        fontSize: '0.875rem',
+        color: '#6b7280',
+      }}>
+        Belum punya akun?{' '}
+        <Link href="/register" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+          Daftar di sini
+        </Link>
+      </p>
+    </>
+  )
+}
+
+export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
@@ -84,106 +200,7 @@ export default function LoginPage() {
           Lumière Bar & Resto
         </p>
         
-        {successMessage && (
-          <div style={{
-            padding: '0.75rem',
-            background: '#d1fae5',
-            color: '#065f46',
-            borderRadius: '6px',
-            marginBottom: '1rem',
-            fontSize: '0.875rem',
-          }}>
-            {successMessage}
-          </div>
-        )}
-        
-        {error && (
-          <div style={{
-            padding: '0.75rem',
-            background: '#fee2e2',
-            color: '#991b1b',
-            borderRadius: '6px',
-            marginBottom: '1rem',
-            fontSize: '0.875rem',
-          }}>
-            {error}
-          </div>
-        )}
-        
-        <form action={handleSubmit}>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              marginBottom: '0.5rem',
-              color: '#374151',
-            }}>
-              Email
-            </label>
-            <input
-              type="email"
-              name="email"
-              placeholder="nama@email.com"
-              required
-              style={{
-                width: '100%',
-                padding: '0.625rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '1rem',
-              }}
-            />
-            {fieldErrors.email && (
-              <p style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                {fieldErrors.email[0]}
-              </p>
-            )}
-          </div>
-          
-          <div style={{ marginBottom: '1.5rem' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '0.875rem',
-              fontWeight: '500',
-              marginBottom: '0.5rem',
-              color: '#374151',
-            }}>
-              Password
-            </label>
-            <input
-              type="password"
-              name="password"
-              required
-              style={{
-                width: '100%',
-                padding: '0.625rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '1rem',
-              }}
-            />
-            {fieldErrors.password && (
-              <p style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                {fieldErrors.password[0]}
-              </p>
-            )}
-          </div>
-          
-          <SubmitButton />
-        </form>
-        
-        <p style={{
-          textAlign: 'center',
-          marginTop: '1rem',
-          fontSize: '0.875rem',
-          color: '#6b7280',
-        }}>
-          Belum punya akun?{' '}
-          <Link href="/register" style={{ color: '#3b82f6', textDecoration: 'none' }}>
-            Daftar di sini
-          </Link>
-        </p>
+        <LoginForm />
       </div>
     </div>
   )
