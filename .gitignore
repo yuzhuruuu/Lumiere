@@ -22,6 +22,9 @@ dist/
 # Vercel
 .vercel
 
+# Supabase CLI temporary state
+supabase/.temp/
+
 # IDE
 .vscode/
 .idea/
