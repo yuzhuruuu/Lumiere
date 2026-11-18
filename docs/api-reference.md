@@ -120,7 +120,9 @@ dibaca; tidak ada data kontak pelanggan yang dikembalikan.
   lewat RPC `create_reservation(...)`.
 - Server juga melakukan preflight untuk pesan error yang ramah: tanggal/jam
   tidak valid, tanggal/jam sudah lewat, meja tidak aktif, kapasitas kurang,
-  di luar jam operasional, menu tidak tersedia, dan minimum order.
+  di luar jam operasional, menu tidak tersedia, dan minimum order. Database
+  memeriksa ulang aturan yang sama, termasuk jam hari ini yang sudah lewat dan
+  reschedule ke jam yang sudah lewat.
 - Response `201` menyertakan reservasi, item yang benar-benar tersimpan, dan
   `bill` estimasi:
 

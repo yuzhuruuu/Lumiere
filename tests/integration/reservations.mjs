@@ -67,6 +67,21 @@ function assertNoError(result, label) {
   }
 }
 
+function todayJakarta() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const value = (type) => parts.find((part) => part.type === type).value
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
+function dayOfWeekForDate(date) {
+  return new Date(`${date}T00:00:00Z`).getUTCDay()
+}
+
 async function waitForProfile(userId) {
   for (let attempt = 0; attempt < 20; attempt += 1) {
     const { data, error } = await admin
@@ -247,6 +262,40 @@ async function main() {
 
     assertNoError({ error }, 'count reservations')
     return data.length
+  }
+
+  async function withTodayAllDayHours(fn) {
+    const today = todayJakarta()
+    const dayOfWeek = dayOfWeekForDate(today)
+    const { data: oldHours, error: readError } = await admin
+      .from('operating_hours')
+      .select('open_time, close_time, is_closed')
+      .eq('day_of_week', dayOfWeek)
+      .single()
+
+    assertNoError({ error: readError }, 'read today operating hours')
+
+    const { error: updateError } = await admin
+      .from('operating_hours')
+      .update({
+        open_time: '00:00:00',
+        close_time: '24:00:00',
+        is_closed: false,
+      })
+      .eq('day_of_week', dayOfWeek)
+
+    assertNoError({ error: updateError }, 'set today operating hours')
+
+    try {
+      return await fn(today, dayOfWeek)
+    } finally {
+      const { error: restoreError } = await admin
+        .from('operating_hours')
+        .update(oldHours)
+        .eq('day_of_week', dayOfWeek)
+
+      assertNoError({ error: restoreError }, 'restore today operating hours')
+    }
   }
 
   let validReservation
@@ -486,6 +535,49 @@ async function main() {
     assert.equal(result.error?.code, '23514')
     assert.match(result.error.message, /masa lalu/i)
     assert.equal(await countReservations(tableC.id, date), 0)
+  })
+
+  await test('TC-08e reservasi hari ini dengan jam sudah lewat ditolak database', async () => {
+    await withTodayAllDayHours(async (today) => {
+      const result = await createReservation(clientA, {
+        p_reservation_date: today,
+        p_start_time: '00:00',
+        p_table_id: tableC.id,
+        p_guest_count: 2,
+      })
+
+      assert.equal(result.error?.code, '23514')
+      assert.match(result.error.message, /sudah lewat/i)
+      assert.equal(await countReservations(tableC.id, today), 0)
+    })
+  })
+
+  await test('TC-08f reschedule ke jam hari ini yang sudah lewat ditolak database', async () => {
+    await withTodayAllDayHours(async (today) => {
+      const created = await createReservation(clientA, {
+        p_reservation_date: '2099-02-12',
+        p_start_time: '19:00',
+        p_table_id: tableC.id,
+        p_guest_count: 2,
+      })
+      assertNoError(created, 'create future reservation for reschedule test')
+
+      const update = await admin
+        .from('reservations')
+        .update({ reservation_date: today, start_time: '00:00' })
+        .eq('id', created.data.id)
+
+      assert.equal(update.error?.code, '23514')
+      assert.match(update.error.message, /sudah lewat/i)
+
+      const persisted = await clientA
+        .from('reservations')
+        .select('reservation_date, start_time')
+        .eq('id', created.data.id)
+        .single()
+      assertNoError(persisted, 'read reservation after rejected reschedule')
+      assert.equal(persisted.data.reservation_date, '2099-02-12')
+    })
   })
 
   await test('durasi dan jumlah tamu di luar batas ditolak database', async () => {
