@@ -31,7 +31,6 @@ dipisahkan oleh folder, bukan oleh repo/aplikasi berbeda.
 | `app/dashboard/admin/` | Frontend | Dashboard admin |
 | `app/check-seed/`, `app/test-koneksi/` | Frontend/Backend | Halaman bantu pengujian |
 | `components/` | Frontend | Komponen React reusable |
-| `public/` | Frontend | Aset statis |
 | `app/api/**` | Backend | Seluruh REST API |
 | `app/actions/auth.js` | Backend | Server Actions register/login/logout |
 | `lib/supabase/` | Backend | Client Supabase (browser/server/admin) |
