@@ -67,7 +67,7 @@ folder `backend/` terpisah.
 
 ---
 
-## 4. Jika dosen/PM memang meminta monorepo sebenarnya
+## 4. Jika memang meminta monorepo sebenarnya
 
 Monorepo teknis dipakai jika frontend dan backend adalah **aplikasi terpisah**
 (misalnya frontend Vite/React, backend Express/Nest) atau perlu deploy terpisah.
