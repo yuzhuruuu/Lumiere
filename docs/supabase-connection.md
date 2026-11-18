@@ -84,8 +84,9 @@ const supabase = await createClient()
 import { createClient } from '@/lib/supabase/client'
 const supabase = createClient()
 
-// Admin operation (jarang): gunakan admin client
-import { supabaseAdmin } from '@/lib/supabase/admin'
+// Admin operation (jarang): gunakan lazy admin client
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
+const admin = getSupabaseAdmin()
 // PASTIKAN sudah cek auth/authorization dulu!
 ```
 

@@ -48,9 +48,9 @@ npm run test:integration:staff
   order, `400` input tidak valid, anonim `401`, dan detail milik pelanggan lain
   `404`.
 - `staff-reservations.mjs`: pencarian kode barcode, validasi setuju/tolak,
-  invoice + pajak 10%, DP 50%, pelunasan sampai lunas, check-in, penolakan
-  check-in berulang, penyelesaian reservasi, dan akses staf/admin ditolak untuk
-  pelanggan.
+  invoice + pajak 10%, satu order per reservasi + status dapur, DP 50%,
+  pelunasan sampai lunas, check-in, penolakan check-in berulang, penyelesaian
+  reservasi, rekap admin, dan pembatasan akses per peran.
 
 Test membuat user, meja, kategori, dan menu dengan suffix unik. Data uji akan
 terus bertambah di database lokal; reset project lokal jika ingin bersih.
