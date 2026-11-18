@@ -26,7 +26,9 @@ export async function GET() {
       supabase.from('reservations').select('status, reservation_date'),
       supabase
         .from('reservation_items')
-        .select('menu_item_id, quantity, menu_items ( name )')
+        .select(
+          'menu_item_id, quantity, menu_items ( name ), reservations ( status )'
+        )
         .limit(2000),
     ])
 
@@ -82,8 +84,11 @@ export async function GET() {
     ).length
 
     // ---- Menu terlaris ----
+    // Jangan hitung item dari reservasi yang dibatalkan/ditolak/tidak hadir.
+    const EXCLUDED = ['dibatalkan', 'ditolak', 'tidak_hadir']
     const menuAgg = {}
     for (const row of items) {
+      if (EXCLUDED.includes(row.reservations?.status)) continue
       const name = row.menu_items?.name || `Menu #${row.menu_item_id}`
       if (!menuAgg[row.menu_item_id]) {
         menuAgg[row.menu_item_id] = { menu_item_id: row.menu_item_id, name, qty: 0 }
