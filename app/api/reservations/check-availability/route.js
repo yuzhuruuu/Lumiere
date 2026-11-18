@@ -70,7 +70,7 @@ export async function POST(request) {
     // Status yang memblokir meja: menunggu_validasi, dikonfirmasi, check_in
     const { data: bookedReservations, error: bookingError } = await supabase
       .from('reservations')
-      .select('table_id')
+      .select('table_id, start_time, duration_minutes')
       .eq('reservation_date', reservation_date)
       .in('status', ['menunggu_validasi', 'dikonfirmasi', 'check_in'])
     
@@ -82,32 +82,20 @@ export async function POST(request) {
       )
     }
     
-    // Untuk setiap meja yang di-book, cek apakah waktunya bentrok
+    // Hitung meja yang bentrok waktunya (overlap) di memori.
+    // Satu query saja, tidak perlu query ulang per reservasi.
     const bookedTableIds = new Set()
     
     for (const booking of bookedReservations) {
-      // Ambil detail reservasi untuk cek waktu
-      const { data: reservation } = await supabase
-        .from('reservations')
-        .select('table_id, start_time, duration_minutes')
-        .eq('table_id', booking.table_id)
-        .eq('reservation_date', reservation_date)
-        .in('status', ['menunggu_validasi', 'dikonfirmasi', 'check_in'])
-        .single()
+      const [bookHours, bookMinutes] = booking.start_time.split(':').map(Number)
+      const bookStartMinutes = bookHours * 60 + bookMinutes
+      const bookEndMinutes = bookStartMinutes + booking.duration_minutes
       
-      if (reservation) {
-        const [bookHours, bookMinutes] = reservation.start_time.split(':').map(Number)
-        const bookStartMinutes = bookHours * 60 + bookMinutes
-        const bookEndMinutes = bookStartMinutes + reservation.duration_minutes
-        
-        // Cek apakah ada overlap waktu
-        const hasOverlap = (
-          (startMinutes < bookEndMinutes && endMinutes > bookStartMinutes)
-        )
-        
-        if (hasOverlap) {
-          bookedTableIds.add(reservation.table_id)
-        }
+      // Overlap: mulai baru < selesai lama DAN selesai baru > mulai lama
+      const hasOverlap = startMinutes < bookEndMinutes && endMinutes > bookStartMinutes
+      
+      if (hasOverlap) {
+        bookedTableIds.add(booking.table_id)
       }
     }
     

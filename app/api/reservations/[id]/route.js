@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request, { params }) {
   const supabase = await createClient()
-  const { id } = params
+  // Next.js 15/16: params adalah Promise, wajib di-await
+  const { id } = await params
   
   try {
     // 1. Cek login

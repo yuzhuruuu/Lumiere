@@ -87,6 +87,10 @@ export async function proxy(request) {
 
 export const config = {
   matcher: [
+    // Sertakan API agar token sesi ikut di-refresh sebelum Route Handler
+    // memanggil supabase.auth.getUser(). Tanpa ini, token yang kedaluwarsa
+    // membuat endpoint menganggap pengguna belum login.
+    '/api/:path*',
     '/dashboard/:path*',
     '/login',
     '/register',
