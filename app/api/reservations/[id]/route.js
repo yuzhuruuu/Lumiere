@@ -78,13 +78,10 @@ export async function GET(request, { params }) {
     }
     
     // 3. Cek ownership (pelanggan hanya bisa lihat milik sendiri)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    
-    if (profile?.role === 'pelanggan' && reservation.customer_id !== user.id) {
+    if (
+      auth.profile.role === 'pelanggan' &&
+      reservation.customer_id !== auth.user.id
+    ) {
       return NextResponse.json(
         { error: 'Anda tidak memiliki akses ke reservasi ini' },
         { status: 403 }

@@ -61,7 +61,41 @@ await fetch('/api/menu/items?search=steak').then((r) => r.json())
 }
 ```
 
-Response berisi `available`, daftar `tables`, dan `alternatives` (slot jam lain).
+Endpoint ini **wajib login** (pelanggan/staf/admin). Response memakai bentuk
+berikut:
+
+```json
+{
+  "is_open": true,
+  "available_tables": [
+    { "id": 9201, "code": "A01", "capacity": 4, "area": "Indoor" }
+  ],
+  "grouped_by_area": {
+    "Indoor": [
+      { "id": 9201, "code": "A01", "capacity": 4, "area": "Indoor" }
+    ]
+  },
+  "total_available": 1,
+  "operating_hours": { "open_time": "10:00", "close_time": "24:00" },
+  "query": {
+    "date": "2026-11-20",
+    "start_time": "19:00",
+    "end_time": "21:00",
+    "ends_next_day": false,
+    "duration_minutes": 120,
+    "guest_count": 4
+  }
+}
+```
+
+Jika restoran tutup atau waktu di luar jam operasional, response tetap `200`
+dengan `is_open: false`, daftar meja kosong, dan `message` yang menjelaskan
+alasannya. Error `400` berarti input/tanggal/jam tidak valid atau sudah lewat;
+`401` berarti belum login.
+
+Route ini memakai query agregat server-side untuk melihat benturan jadwal
+lintas pelanggan. Hanya `table_id`, `start_time`, dan `duration_minutes` yang
+dibaca; tidak ada data kontak pelanggan yang dikembalikan.
 
 ### Buat reservasi
 
@@ -84,17 +118,54 @@ Response berisi `available`, daftar `tables`, dan `alternatives` (slot jam lain)
 
 - Perhitungan total, minimum order, dan benturan jadwal dilakukan **database**
   lewat RPC `create_reservation(...)`.
-- Response menyertakan `bill` (estimasi): `subtotal`, `tax_percentage` (10%),
-  `tax_amount`, `total_amount`, `dp_amount`. Angka resmi tetap dihitung
-  database saat `generate_invoice`.
-- Error `23P01` → jadwal bentrok; `23514` → aturan reservasi/minimum order.
+- Server juga melakukan preflight untuk pesan error yang ramah: tanggal/jam
+  tidak valid, tanggal/jam sudah lewat, meja tidak aktif, kapasitas kurang,
+  di luar jam operasional, menu tidak tersedia, dan minimum order.
+- Response `201` menyertakan reservasi, item yang benar-benar tersimpan, dan
+  `bill` estimasi:
+
+```json
+{
+  "message": "Reservasi berhasil dibuat",
+  "reservation": {
+    "id": "uuid",
+    "reservation_code": "RSV-261118-00001",
+    "status": "menunggu_validasi"
+  },
+  "items": [
+    {
+      "id": 1,
+      "menu_item_id": 9101,
+      "quantity": 2,
+      "unit_price": 150000,
+      "subtotal": 300000
+    }
+  ],
+  "bill": {
+    "source": "estimate",
+    "subtotal": 300000,
+    "tax_percentage": 10,
+    "tax_amount": 30000,
+    "total_amount": 330000,
+    "dp_percentage": 50,
+    "dp_amount": 165000
+  }
+}
+```
+
+- Harga item dan subtotal berasal dari trigger database, bukan dari client.
+  Angka resmi tetap dihitung database saat `generate_invoice`; setelah invoice
+  ada, detail reservasi memakai `bill.source: "invoice"`.
+- Error `23P01` → jadwal bentrok (`409`); `23514` → aturan reservasi/minimum
+  order (`422`); `42501`/`28000` → akses ditolak; input tidak valid → `400`
+  dengan `details` per field.
 
 ### Riwayat & detail
 
 | Method | Path | Keterangan |
 |---|---|---|
 | GET | `/api/reservations` | Reservasi milik sendiri (staf/admin: semua) |
-| GET | `/api/reservations/[id]` | Detail + item + `bill` + invoice + pembayaran + riwayat status |
+| GET | `/api/reservations/[id]` | Detail + item + `bill` + invoice + pembayaran + riwayat status + `barcode_data` untuk check-in |
 | PATCH | `/api/reservations/[id]/cancel` | Batalkan reservasi sendiri (`menunggu_validasi`/`dikonfirmasi`) |
 
 Body pembatalan (opsional):
