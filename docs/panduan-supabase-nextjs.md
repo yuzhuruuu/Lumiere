@@ -119,14 +119,29 @@ export async function createClient() {
 import 'server-only'   // build akan gagal jika file ini ikut terimpor ke kode browser
 import { createClient } from '@supabase/supabase-js'
 
-export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { persistSession: false } }
-)
+let adminClient = null
+
+export function getSupabaseAdmin() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('Environment variable Supabase belum lengkap')
+  }
+  if (!adminClient) {
+    adminClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      { auth: { persistSession: false } }
+    )
+  }
+  return adminClient
+}
 ```
 
-Selain tiga file itu, kamu perlu `middleware.js` yang menyegarkan sesi dan mengarahkan pengunjung tanpa login dari halaman dashboard ke `/login`. Minta AI agent-mu membuatnya mengikuti dokumentasi resmi "Supabase Auth with Next.js (SSR)", karena detailnya berubah antarversi.
+Selain tiga file itu, kamu perlu `proxy.js` (Next.js 16 memakai `proxy()`, bukan
+`middleware.js`) yang menyegarkan sesi dan mengarahkan pengunjung tanpa login
+dari halaman dashboard ke `/login`. Minta AI agent-mu membuatnya mengikuti
+dokumentasi resmi "Supabase Auth with Next.js (SSR)", karena detailnya berubah
+antarversi.
 
 ### 3.6 Buat akun uji untuk tiap role
 1. Daftar tiga akun lewat halaman daftar aplikasi, atau lewat **Authentication → Users → Add user**: `pelanggan@...`, `staf@...`, `admin@...` (email fiktif).
@@ -201,7 +216,7 @@ Kode error PostgreSQL yang sering muncul: `23505` unique dilanggar (data ganda),
 
 ### 4.2 Aturan kapan memakai klien yang mana
 - Default: **klien server biasa** (`lib/supabase/server.js`). Query berjalan sebagai pengguna itu, RLS ikut menjaga.
-- `supabaseAdmin` hanya untuk hal yang memang melewati RLS dan tidak bisa dilakukan sebagai pengguna biasa (misalnya skrip pembuat akun uji). Setiap kali kamu mengetik `supabaseAdmin`, tanya diri sendiri: "Apakah aku sudah memeriksa siapa pemintanya?"
+- `getSupabaseAdmin()` hanya untuk hal yang memang melewati RLS dan tidak bisa dilakukan sebagai pengguna biasa (misalnya skrip pembuat akun uji). Setiap kali kamu memanggilnya, tanya diri sendiri: "Apakah aku sudah memeriksa siapa pemintanya?"
 - Jangan menaruh logika harga/total/status di client. Hitung di server atau database.
 
 ## 5. Aturan main backend yang baik (ringkas)

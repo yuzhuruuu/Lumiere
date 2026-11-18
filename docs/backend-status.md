@@ -108,7 +108,7 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 ## 5. Verifikasi yang sudah dilakukan
 
 - `npm run build` ✅
-- `npx eslint .` ✅
+- `npm run lint` ✅
 - Unit test Vitest: **5 file, 41 test lulus** (`npm test`)
 - Integration test database terhadap Supabase lokal: **21/21 lulus**
   (`npm run test:integration`)
@@ -127,12 +127,14 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   - meja yang sudah dipesan hilang dari ketersediaan, termasuk bagi pelanggan lain
   - benturan jadwal `409`, kapasitas/minimum order `422`, input tidak valid `400`
   - anonim `401` dan detail milik pelanggan lain `404`
-- Integration test alur staf: **14/14 lulus**
+- Integration test alur staf: **18/18 lulus**
   (`npm run test:integration:staff`)
   - pencarian kode barcode, validasi setuju/tolak dengan alasan
   - invoice otomatis 10% pajak, DP 50%, pelunasan sampai lunas
+  - satu order per reservasi + transisi status pesanan dapur
   - check-in, penolakan check-in berulang, dan penyelesaian reservasi
-  - pelanggan ditolak dari API staf/admin
+  - pelanggan ditolak dari API staf/admin; staf ditolak dari API admin;
+    admin dapat membaca rekap transaksi dan pengguna
 
 Integration test hanya boleh dijalankan terhadap Supabase dan aplikasi
 `localhost`/`127.0.0.1`; script menolak URL lain agar data production tidak

@@ -1,7 +1,7 @@
 # Panduan Seed Data — Lumière Bar & Resto
 
 ## File
-`seed_lumiere_bar_resto.sql`
+`docs/seed.sql`
 
 File ini berisi data dummy yang mengikuti rancangan 12 tabel database dan aturan PRD Lumière Bar & Resto. Jalankan setelah seluruh migration Supabase berhasil diterapkan.
 
@@ -71,7 +71,7 @@ Akun dibuat sebagai user Supabase Auth dengan email terkonfirmasi untuk kebutuha
 
 1. Pastikan migration 1 sampai 5 sudah dijalankan dan tidak ada error.
 2. Buka **Supabase Dashboard → SQL Editor**.
-3. Buat query baru, lalu buka dan salin seluruh isi file `seed_lumiere_bar_resto.sql`.
+3. Buat query baru, lalu buka dan salin seluruh isi file `docs/seed.sql`.
 4. Jalankan query menggunakan koneksi tepercaya/SQL Editor, bukan dari browser atau client aplikasi.
 5. Periksa hasil dengan query pemeriksaan yang tersedia di bagian akhir file SQL.
 6. Uji login memakai salah satu akun demo di atas.

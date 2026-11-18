@@ -28,14 +28,16 @@ Vercel akan auto-detect Next.js. Settings default sudah benar:
 
 ### 3. Environment Variables
 
-Jika sudah ada environment variables (database, API keys):
+Tambahkan tiga environment variable yang dipakai aplikasi:
 
 1. Klik **"Environment Variables"**
 2. Tambahkan variable satu per satu:
-   - Key: `DATABASE_URL`
-   - Value: (isi dengan connection string)
+   - `NEXT_PUBLIC_SUPABASE_URL` — URL project Supabase
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — anon/public key (boleh ke browser)
+   - `SUPABASE_SERVICE_ROLE_KEY` — service role key (HANYA server, jangan pakai prefix `NEXT_PUBLIC_`)
    - Environment: Production, Preview, Development (pilih sesuai kebutuhan)
 
+Lihat juga `docs/vercel-build-fix.md` untuk catatan build tanpa environment variables.
 **PENTING**: Jangan commit file `.env.local` ke GitHub!
 
 ### 4. Deploy

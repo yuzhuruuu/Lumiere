@@ -123,11 +123,6 @@ export function getSupabaseAdmin() {
 
 **Cara pakai (untuk future development):**
 ```js
-// SEBELUM
-import { supabaseAdmin } from '@/lib/supabase/admin'
-const { data } = await supabaseAdmin.from('profiles').select()
-
-// SESUDAH
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 const admin = getSupabaseAdmin()
 const { data } = await admin.from('profiles').select()
@@ -148,7 +143,7 @@ npm run build
 
 ### Test Lint
 ```bash
-npx eslint .
+npm run lint
 ✓ No errors
 ```
 

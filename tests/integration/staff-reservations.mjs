@@ -33,6 +33,7 @@ const stamp = Date.now().toString(36).toUpperCase()
 const password = 'LumiereTest#2026'
 const customerEmail = `staff-test-customer-${stamp.toLowerCase()}@lumiere.test`
 const staffEmail = `staff-test-staff-${stamp.toLowerCase()}@lumiere.test`
+const adminEmail = `staff-test-admin-${stamp.toLowerCase()}@lumiere.test`
 
 const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -193,10 +194,28 @@ async function main() {
     .eq('id', staffResult.data.user.id)
   assertNoError({ error: staffRoleError }, 'set staff role')
 
+  const adminResult = await admin.auth.admin.createUser({
+    email: adminEmail,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: 'Staff Test Admin', phone: '081234567823' },
+  })
+  assertNoError(adminResult, 'create admin')
+  await waitForProfile(adminResult.data.user.id)
+
+  const { error: adminRoleError } = await admin
+    .from('profiles')
+    .update({ role: 'admin', is_active: true })
+    .eq('id', adminResult.data.user.id)
+  assertNoError({ error: adminRoleError }, 'set admin role')
+
   const customerClient = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const staffClient = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  const adminClient = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
@@ -213,6 +232,13 @@ async function main() {
   })
   assertNoError(staffLogin, 'login staff')
   const staffCookie = buildCookie(staffLogin.data.session)
+
+  const adminLogin = await adminClient.auth.signInWithPassword({
+    email: adminEmail,
+    password,
+  })
+  assertNoError(adminLogin, 'login admin')
+  const adminCookie = buildCookie(adminLogin.data.session)
 
   const reservationPayload = {
     contact_name: 'Staff Test Customer',
@@ -272,6 +298,29 @@ async function main() {
     assert.equal(response.status, 403)
   })
 
+  await test('staf tidak boleh mengakses API admin', async () => {
+    const response = await request('/api/admin/users', {
+      cookie: staffCookie,
+    })
+
+    assert.equal(response.status, 403)
+  })
+
+  await test('admin dapat membaca rekap transaksi dan pengguna', async () => {
+    const report = await request('/api/admin/reports/summary', {
+      cookie: adminCookie,
+    })
+    assert.equal(report.status, 200)
+    assert.ok(report.body.revenue)
+    assert.ok(report.body.invoices)
+    assert.ok(report.body.reservations)
+    assert.ok(Array.isArray(report.body.top_menu))
+
+    const users = await request('/api/admin/users', { cookie: adminCookie })
+    assert.equal(users.status, 200)
+    assert.ok(users.body.total >= 1)
+  })
+
   await test('staf menyetujui reservasi', async () => {
     const response = await request(
       `/api/staff/reservations/${reservation.id}/validate`,
@@ -300,6 +349,43 @@ async function main() {
     assert.equal(invoice.total_amount, 330000)
     assert.equal(invoice.dp_amount, 165000)
     assert.equal(invoice.payment_status, 'belum_dibayar')
+  })
+
+  await test('invoice membuat satu order dengan snapshot harga', async () => {
+    const { data: orders, error } = await admin
+      .from('orders')
+      .select('id, status')
+      .eq('reservation_id', reservation.id)
+
+    assertNoError({ error }, 'read orders')
+    assert.equal(orders.length, 1)
+    assert.equal(orders[0].status, 'menunggu')
+  })
+
+  await test('staf memperbarui status pesanan sesuai alur dapur', async () => {
+    const { data: order, error } = await admin
+      .from('orders')
+      .select('id, status')
+      .eq('reservation_id', reservation.id)
+      .single()
+    assertNoError({ error }, 'read order for status test')
+
+    for (const status of ['disiapkan', 'disajikan', 'selesai']) {
+      const response = await request(`/api/staff/orders/${order.id}`, {
+        method: 'PATCH',
+        cookie: staffCookie,
+        body: { status },
+      })
+      assert.equal(response.status, 200)
+      assert.equal(response.body.order.status, status)
+    }
+
+    const invalid = await request(`/api/staff/orders/${order.id}`, {
+      method: 'PATCH',
+      cookie: staffCookie,
+      body: { status: 'disiapkan' },
+    })
+    assert.equal(invalid.status, 409)
   })
 
   await test('detail pelanggan memakai angka invoice, bukan estimasi', async () => {

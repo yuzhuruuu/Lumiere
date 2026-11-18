@@ -52,17 +52,17 @@ Dashboard untuk role pelanggan:
 - Hanya pelanggan yang bisa akses
 - Menampilkan nama user dan role
 - Tombol logout
-- Placeholder untuk fitur reservasi dan riwayat
+- Riwayat reservasi milik sendiri dan ringkasan tagihan dari API
 
 ### 7. **app/dashboard/staf/page.js**
 Dashboard untuk role staf dan admin:
 - Cek role: hanya staf dan admin
-- Placeholder untuk fitur validasi reservasi, check-in, manajemen pesanan
+- Ringkasan operasional serta aksi validasi, check-in, reschedule, dan pesanan lewat `/api/staff/*`
 
 ### 8. **app/dashboard/admin/page.js**
 Dashboard untuk role admin saja:
 - Cek role: hanya admin
-- Placeholder untuk fitur CRUD menu, meja, jam operasional, manajemen user
+- CRUD menu, kategori, meja, jam operasional, profil restoran, pengguna, dan rekap lewat `/api/admin/*`
 
 ### 9. **components/LogoutButton.js**
 Komponen logout button:
@@ -179,16 +179,15 @@ UPDATE profiles SET role = 'admin' WHERE email = 'user@email.com';
 
 ## Next Steps
 
-Setelah autentikasi selesai:
-1. Implementasi fitur pelanggan: reservasi, pilih menu, riwayat
-2. Implementasi fitur staf: validasi reservasi, check-in, manajemen pesanan
-3. Implementasi fitur admin: CRUD menu, meja, jam operasional
-4. Testing end-to-end semua role
-5. Deploy ke Vercel dengan environment variables
+Fitur utama di atas sudah tersedia. Pekerjaan lanjutan:
+1. Uji regresi alur reservasi dan pembayaran secara berkala (`npm run test:integration:*`)
+2. Pastikan environment variables production sudah benar di Vercel
+3. Rate limiting endpoint publik bila diperlukan
+4. Deploy ke Vercel setelah perubahan di-merge ke branch utama
 
 ## Catatan Penting
 
-- **Jangan pakai `supabaseAdmin`** untuk login atau baca role user
+- **Jangan pakai `getSupabaseAdmin()`** untuk login atau baca role user
 - **Field `role` tidak dikirim dari form** - selalu ditentukan database
 - **Error internal tidak ditampilkan ke user** - hanya log di server
 - **RLS policy aktif** - user hanya bisa baca profil sendiri (kecuali admin/staf)
