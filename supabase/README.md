@@ -14,6 +14,12 @@ Schema production sudah diterapkan. Riwayat migrasi di
 | `20261031000003` | `storage` |
 | `20261031000004` | `auto_cancel_cron` |
 
+Migration baru yang akan diterapkan pada deployment berikutnya:
+
+| Version | Name |
+|---|---|
+| `20261118000001` | `reservation_same_day_time_guard` |
+
 Karena itu, integrasi Supabase tidak akan menjalankan ulang migration lama
 tersebut di project production.
 

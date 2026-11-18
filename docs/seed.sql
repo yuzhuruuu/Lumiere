@@ -321,7 +321,9 @@ SELECT
         WHEN (((n - 1) % 20) + 1) BETWEEN 14 AND 17 THEN 6
         ELSE 8
     END,
-    (now() AT TIME ZONE 'Asia/Jakarta')::date + ((n - 1) / 20),
+    -- Mulai besok agar seed tetap bisa dijalankan kapan pun setelah trigger
+    -- database menolak reservasi hari ini yang jamnya sudah lewat.
+    (now() AT TIME ZONE 'Asia/Jakarta')::date + ((n - 1) / 20) + 1,
     TIME '10:00' + (((n - 1) % 3) * INTERVAL '4 hours')
 FROM generate_series(1,28) AS gs(n);
 

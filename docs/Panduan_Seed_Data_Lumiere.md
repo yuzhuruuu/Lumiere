@@ -69,7 +69,7 @@ Akun dibuat sebagai user Supabase Auth dengan email terkonfirmasi untuk kebutuha
 
 ## Cara menjalankan
 
-1. Pastikan migration 1 sampai 4 sudah dijalankan dan tidak ada error.
+1. Pastikan migration 1 sampai 5 sudah dijalankan dan tidak ada error.
 2. Buka **Supabase Dashboard → SQL Editor**.
 3. Buat query baru, lalu buka dan salin seluruh isi file `seed_lumiere_bar_resto.sql`.
 4. Jalankan query menggunakan koneksi tepercaya/SQL Editor, bukan dari browser atau client aplikasi.
@@ -84,5 +84,6 @@ Akun dibuat sebagai user Supabase Auth dengan email terkonfirmasi untuk kebutuha
 - Data menu, meja, dan akun memakai ID/UUID khusus seed. Script menghapus dan membuat ulang hanya reservasi fixture dengan UUID khusus tersebut saat dijalankan kembali; tidak menghapus reservasi pengguna lain.
 - Karena seed membuat akun langsung melalui `auth.users`, jalankan sebagai admin/SQL Editor. Jangan menjalankan file ini dari endpoint publik aplikasi.
 - `reservation_status_logs` dihasilkan oleh trigger sehingga tidak diinsert manual.
+- Tanggal reservasi contoh mulai **besok** agar seed tetap bisa dijalankan kapan pun. Trigger database menolak reservasi hari ini yang jamnya sudah lewat.
 - `reservation_items.unit_price` diisi otomatis oleh trigger dari harga menu yang tersimpan, sehingga snapshot harga konsisten dengan database.
 - Pada aplikasi yang berjalan, pembuatan reservasi tetap harus menggunakan RPC `create_reservation(...)` agar pemeriksaan minimum pembelian terjadi dalam satu transaksi. Pembuatan invoice tetap menggunakan `generate_invoice(...)` sesuai hak akses staf/admin.

@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "node tests/integration/reservations.mjs",
-    "test:integration:api": "node tests/integration/api-reservations.mjs"
+    "test:integration:api": "node tests/integration/api-reservations.mjs",
+    "test:integration:staff": "node tests/integration/staff-reservations.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

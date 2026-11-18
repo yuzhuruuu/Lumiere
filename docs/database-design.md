@@ -7,6 +7,7 @@ File migration, dijalankan berurutan:
 2. `supabase/migrations/20261031000002_rls_policies.sql`: Row Level Security dan hak akses.
 3. `supabase/migrations/20261031000003_storage.sql`: bucket Storage untuk foto menu/restoran.
 4. `supabase/migrations/20261031000004_auto_cancel_cron.sql`: jadwal `pg_cron` yang membatalkan reservasi tak divalidasi.
+5. `supabase/migrations/20261118000001_reservation_same_day_time_guard.sql`: validasi database untuk reservasi hari ini yang jamnya sudah lewat dan reschedule ke jam lewat.
 
 Data contoh ada di `supabase/seed.sql` (terpisah dari migration, dijalankan terakhir).
 
@@ -331,6 +332,6 @@ Yang masih perlu diperhatikan:
 
 ## 9. Cara menjalankan
 
-Lihat `docs/panduan-supabase-nextjs.md` untuk langkah lengkap membuat project Supabase, menjalankan keempat migration, dan menyambungkannya ke Next.js.
+Lihat `docs/panduan-supabase-nextjs.md` untuk langkah lengkap membuat project Supabase, menjalankan kelima migration, dan menyambungkannya ke Next.js.
 
-Catatan pengujian: migration 1 dan 2 sudah diuji di PostgreSQL 16 (dengan schema `auth` tiruan), termasuk pemanggilan fungsi sebagai peran `authenticated`/`anon` dan logika pembatalan otomatis. Migration 3 (Storage) dan 4 (penjadwalan `pg_cron`) belum bisa diuji di luar Supabase. Setelah dijalankan, periksa bucket di dashboard dan jadwal dengan `SELECT * FROM cron.job;`.
+Catatan pengujian: migration 1, 2, dan 5 sudah diuji di PostgreSQL/Supabase lokal, termasuk pemanggilan fungsi sebagai peran `authenticated`/`anon`, benturan jadwal paralel, dan guard jam lewat. Migration 3 (Storage) dan 4 (penjadwalan `pg_cron`) belum bisa diuji penuh di luar Supabase. Setelah dijalankan, periksa bucket di dashboard dan jadwal dengan `SELECT * FROM cron.job;`.

@@ -81,9 +81,9 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   condition dan sudah diuji dengan dua request paralel.
 - Kapasitas meja, jam operasional, tanggal masa lalu, durasi, dan jumlah tamu
   divalidasi trigger database.
-- Route API menolak tanggal/jam yang sudah lewat pada hari yang sama sebelum
-  memanggil RPC; database tetap memeriksa ulang tanggal, jam operasional,
-  kapasitas, dan benturan saat commit.
+- Route API dan trigger database sama-sama menolak tanggal/jam yang sudah lewat
+  pada hari yang sama. Trigger juga menolak reschedule ke jam yang sudah lewat;
+  perpindahan meja saja tetap boleh untuk reservasi yang sedang berjalan.
 - Minimum pembelian dicek saat commit transaksi pembuatan reservasi; response
   error menyertakan `subtotal`, `minimum_order`, dan `shortfall`.
 - Harga item dibekukan dari `menu_items` oleh trigger, bukan dari angka client.
@@ -92,6 +92,9 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   `total_amount = subtotal + tax_amount`. DP default 50% dari total.
 - Pembayaran wajib `idempotency_key` unik; kelebihan bayar ditolak trigger.
 - Role/status akun hanya bisa diubah admin; admin terakhir tidak bisa dinonaktifkan.
+- Keputusan produk: pembuatan reservasi adalah alur pelanggan. Admin/staf tidak
+  membuat reservasi baru; mereka memvalidasi, menjadwalkan ulang, memindahkan
+  meja, dan memproses reservasi yang sudah ada.
 - Akun `is_active = false` ditolak saat login, dashboard, dan semua API.
 - Semua tanggal bisnis memakai zona waktu **Asia/Jakarta (WIB)**.
 - Input pencarian dibersihkan sebelum masuk filter PostgREST.
@@ -107,10 +110,11 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 - `npm run build` ✅
 - `npx eslint .` ✅
 - Unit test Vitest: **5 file, 41 test lulus** (`npm test`)
-- Integration test database terhadap Supabase lokal: **19/19 lulus**
+- Integration test database terhadap Supabase lokal: **21/21 lulus**
   (`npm run test:integration`)
   - reservasi + item + harga snapshot + status log
   - kapasitas, jam operasional, tanggal masa lalu, durasi/jumlah tamu
+  - reservasi hari ini dengan jam sudah lewat, termasuk reschedule lewat trigger
   - benturan jadwal, slot bersambung, meja berbeda, tanggal berbeda
   - dua request paralel tidak menghasilkan double booking
   - minimum order, rollback saat gagal, menu tidak tersedia, meja nonaktif
@@ -123,6 +127,12 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   - meja yang sudah dipesan hilang dari ketersediaan, termasuk bagi pelanggan lain
   - benturan jadwal `409`, kapasitas/minimum order `422`, input tidak valid `400`
   - anonim `401` dan detail milik pelanggan lain `404`
+- Integration test alur staf: **14/14 lulus**
+  (`npm run test:integration:staff`)
+  - pencarian kode barcode, validasi setuju/tolak dengan alasan
+  - invoice otomatis 10% pajak, DP 50%, pelunasan sampai lunas
+  - check-in, penolakan check-in berulang, dan penyelesaian reservasi
+  - pelanggan ditolak dari API staf/admin
 
 Integration test hanya boleh dijalankan terhadap Supabase dan aplikasi
 `localhost`/`127.0.0.1`; script menolak URL lain agar data production tidak
@@ -141,15 +151,13 @@ tersentuh.
 
 1. **Commit & push** semua perubahan ke branch fitur, lalu PR.
 2. **Deploy** ke Vercel dan uji di produksi.
-3. Pastikan migration 1–4 sudah dijalankan di Supabase:
+3. Pastikan migration 1–5 sudah dijalankan di Supabase:
    - `SELECT * FROM cron.job;` → ada `expire-pending-reservations`
    - bucket `restaurant-assets` ada
 4. Ubah `pending_timeout_minutes` dari `0` (nilai seed demo) menjadi `30`
    agar auto-cancel berfungsi.
-5. Sisa keputusan produk: PRD juga menyebut admin dapat membuat reservasi,
-   sedangkan route saat ini hanya mengizinkan `pelanggan` dan policy RLS
-   `reservations_insert_own` juga membatasi pelanggan. Perlu persetujuan
-   kebijakan sebelum menambah migration RLS baru.
+5. Keputusan produk sudah diambil: admin/staf tidak membuat reservasi baru;
+   route dan RLS tetap pelanggan-only. Tidak perlu migration RLS admin.
 6. Opsional untuk nilai tambah:
    - rate limiting endpoint publik (butuh Redis/Upstash di serverless)
    - monitoring/log agregasi
