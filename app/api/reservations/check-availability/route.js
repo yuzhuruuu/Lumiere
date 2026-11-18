@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { checkAvailabilitySchema } from '@/lib/validations/reservation'
+import { todayJakarta } from '@/lib/utils/date'
 
 export async function POST(request) {
   const supabase = await createClient()
@@ -26,8 +27,8 @@ export async function POST(request) {
     
     const { reservation_date, start_time, duration_minutes, guest_count } = parsed.data
     
-    // Validasi tanggal tidak boleh masa lalu
-    const today = new Date().toISOString().split('T')[0]
+    // Validasi tanggal tidak boleh masa lalu (zona waktu WIB)
+    const today = todayJakarta()
     if (reservation_date < today) {
       return NextResponse.json(
         { error: 'Tanggal reservasi tidak boleh di masa lalu' },

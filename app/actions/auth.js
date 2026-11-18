@@ -102,12 +102,19 @@ export async function login(formData) {
   
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .single()
   
   if (!profile) {
+    await supabase.auth.signOut()
     return { error: 'Profil tidak ditemukan. Silakan hubungi admin.' }
+  }
+  
+  // Akun yang dinonaktifkan admin tidak boleh masuk
+  if (!profile.is_active) {
+    await supabase.auth.signOut()
+    return { error: 'Akun Anda dinonaktifkan. Hubungi admin restoran.' }
   }
   
   // Redirect berdasarkan role

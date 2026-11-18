@@ -13,6 +13,13 @@ export async function GET(request) {
   const area = searchParams.get('area') // Indoor, Outdoor, VIP
   const minCapacity = searchParams.get('min_capacity')
   const activeOnly = searchParams.get('active') !== 'false' // default true
+
+  if (minCapacity && !/^\d+$/.test(minCapacity)) {
+    return NextResponse.json(
+      { error: 'min_capacity tidak valid' },
+      { status: 400 }
+    )
+  }
   
   try {
     let query = supabase

@@ -8,6 +8,12 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
 import { createPaymentSchema } from '@/lib/validations/staff'
+import { jakartaDayRange } from '@/lib/utils/date'
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+const ALLOWED_STATUS = ['menunggu', 'berhasil', 'gagal']
 
 export async function GET(request) {
   const supabase = await createClient()
@@ -17,6 +23,35 @@ export async function GET(request) {
   if (auth.error) return auth.error
 
   const invoiceId = searchParams.get('invoice_id')
+  if (invoiceId && !UUID_REGEX.test(invoiceId)) {
+    return NextResponse.json(
+      { error: 'invoice_id tidak valid' },
+      { status: 400 }
+    )
+  }
+
+  const status = searchParams.get('status')
+  if (status && !ALLOWED_STATUS.includes(status)) {
+    return NextResponse.json(
+      { error: 'Status pembayaran tidak valid', allowed: ALLOWED_STATUS },
+      { status: 400 }
+    )
+  }
+
+  const date = searchParams.get('date')
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return NextResponse.json(
+      { error: 'Format tanggal harus YYYY-MM-DD' },
+      { status: 400 }
+    )
+  }
+
+  const parsedLimit = parseInt(searchParams.get('limit') || '50', 10)
+  const parsedOffset = parseInt(searchParams.get('offset') || '0', 10)
+  const limit = Number.isInteger(parsedLimit)
+    ? Math.min(Math.max(parsedLimit, 1), 100)
+    : 50
+  const offset = Number.isInteger(parsedOffset) ? Math.max(parsedOffset, 0) : 0
 
   try {
     let query = supabase
@@ -33,14 +68,20 @@ export async function GET(request) {
         paid_at,
         created_at,
         invoices ( invoice_number, payment_status, total_amount )
-      `
+      `,
+        { count: 'exact' }
       )
       .order('paid_at', { ascending: false })
-      .limit(50)
+      .range(offset, offset + limit - 1)
 
     if (invoiceId) query = query.eq('invoice_id', invoiceId)
+    if (status) query = query.eq('status', status)
+    if (date) {
+      const range = jakartaDayRange(date)
+      query = query.gte('paid_at', range.start).lt('paid_at', range.end)
+    }
 
-    const { data, error } = await query
+    const { data, error, count } = await query
 
     if (error) {
       console.error('Error fetching payments:', error)
@@ -64,7 +105,16 @@ export async function GET(request) {
       created_at: p.created_at,
     }))
 
-    return NextResponse.json({ payments, total: payments.length })
+    return NextResponse.json({
+      payments,
+      total: count ?? payments.length,
+      pagination: {
+        limit,
+        offset,
+        has_more: offset + payments.length < (count ?? 0),
+      },
+      filters: { invoice_id: invoiceId, status, date },
+    })
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json(
@@ -95,6 +145,28 @@ export async function POST(request) {
     }
 
     const d = parsed.data
+
+    // Pastikan invoice ada dan belum dibatalkan. Pemeriksaan ini juga memberi
+    // pesan yang jelas sebelum trigger database menolak pembayaran.
+    const { data: invoiceCheck, error: invoiceCheckError } = await supabase
+      .from('invoices')
+      .select('id, payment_status, total_amount, dp_amount')
+      .eq('id', d.invoice_id)
+      .single()
+
+    if (invoiceCheckError || !invoiceCheck) {
+      return NextResponse.json(
+        { error: 'Invoice tidak ditemukan' },
+        { status: 404 }
+      )
+    }
+
+    if (invoiceCheck.payment_status === 'dibatalkan') {
+      return NextResponse.json(
+        { error: 'Invoice sudah dibatalkan dan tidak bisa menerima pembayaran' },
+        { status: 409 }
+      )
+    }
 
     const { data, error } = await supabase
       .from('payments')

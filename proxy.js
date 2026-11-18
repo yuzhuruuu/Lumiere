@@ -33,6 +33,17 @@ export async function proxy(request) {
 
   const pathname = request.nextUrl.pathname
 
+  // Baca profil sekali saja (role + status aktif)
+  let profile = null
+  if (user) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single()
+    profile = data
+  }
+
   // Proteksi dashboard - harus login
   if (pathname.startsWith('/dashboard')) {
     if (!user) {
@@ -40,16 +51,18 @@ export async function proxy(request) {
       return NextResponse.redirect(loginUrl)
     }
 
-    // Baca role dari profiles untuk proteksi berdasarkan role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
+    // Profil tidak ada / akun dinonaktifkan admin
     if (!profile) {
-      // Jika profil tidak ditemukan, redirect ke login
       const loginUrl = new URL('/login', request.url)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (!profile.is_active) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set(
+        'message',
+        'Akun Anda dinonaktifkan. Hubungi admin restoran.'
+      )
       return NextResponse.redirect(loginUrl)
     }
 
@@ -68,18 +81,10 @@ export async function proxy(request) {
     }
   }
 
-  // Redirect ke dashboard jika sudah login dan akses login/register
-  if ((pathname === '/login' || pathname === '/register') && user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile) {
-      const dashboardUrl = new URL(`/dashboard/${profile.role}`, request.url)
-      return NextResponse.redirect(dashboardUrl)
-    }
+  // Redirect ke dashboard jika sudah login DAN akun aktif
+  if ((pathname === '/login' || pathname === '/register') && user && profile?.is_active) {
+    const dashboardUrl = new URL(`/dashboard/${profile.role}`, request.url)
+    return NextResponse.redirect(dashboardUrl)
   }
 
   return response

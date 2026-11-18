@@ -13,6 +13,13 @@ export async function GET(request) {
   const categoryId = searchParams.get('category_id')
   const availableOnly = searchParams.get('available') === 'true'
   const search = searchParams.get('search')
+
+  if (categoryId && !/^\d+$/.test(categoryId)) {
+    return NextResponse.json(
+      { error: 'category_id tidak valid' },
+      { status: 400 }
+    )
+  }
   
   try {
     let query = supabase

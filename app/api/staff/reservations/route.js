@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
+import { sanitizeSearch } from '@/lib/utils/search'
 
 const ALLOWED_STATUS = [
   'menunggu_validasi',
@@ -40,9 +41,13 @@ export async function GET(request) {
     )
   }
 
-  const search = searchParams.get('search') // kode / nama / telepon
-  const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100)
-  const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10), 0)
+  const search = sanitizeSearch(searchParams.get('search')) // kode / nama / telepon
+  const parsedLimit = parseInt(searchParams.get('limit') || '20', 10)
+  const parsedOffset = parseInt(searchParams.get('offset') || '0', 10)
+  const limit = Number.isInteger(parsedLimit)
+    ? Math.min(Math.max(parsedLimit, 1), 100)
+    : 20
+  const offset = Number.isInteger(parsedOffset) ? Math.max(parsedOffset, 0) : 0
 
   try {
     let query = supabase

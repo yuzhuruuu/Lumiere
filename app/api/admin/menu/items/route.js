@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
 import { menuItemSchema } from '@/lib/validations/admin'
+import { sanitizeSearch } from '@/lib/utils/search'
 
 export async function GET(request) {
   const supabase = await createClient()
@@ -14,7 +15,14 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url)
   const categoryId = searchParams.get('category_id')
-  const search = searchParams.get('search')
+  const search = sanitizeSearch(searchParams.get('search'))
+
+  if (categoryId && !/^\d+$/.test(categoryId)) {
+    return NextResponse.json(
+      { error: 'category_id tidak valid' },
+      { status: 400 }
+    )
+  }
 
   let query = supabase
     .from('menu_items')

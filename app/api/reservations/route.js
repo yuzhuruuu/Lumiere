@@ -5,20 +5,27 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createReservationSchema } from '@/lib/validations/reservation'
+import { requireRole } from '@/lib/auth/require-role'
+import { todayJakarta } from '@/lib/utils/date'
+
+const ALLOWED_STATUS = [
+  'menunggu_validasi',
+  'dikonfirmasi',
+  'check_in',
+  'selesai',
+  'ditolak',
+  'dibatalkan',
+  'tidak_hadir',
+]
 
 // POST - Buat reservasi baru
 export async function POST(request) {
   const supabase = await createClient()
   
   try {
-    // 1. Cek login
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Silakan login terlebih dahulu' },
-        { status: 401 }
-      )
-    }
+    // 1. Cek login + role (hanya pelanggan; RLS juga membatasi)
+    const auth = await requireRole(supabase, ['pelanggan'])
+    if (auth.error) return auth.error
     
     // 2. Validasi input
     const body = await request.json()
@@ -47,8 +54,8 @@ export async function POST(request) {
       notes,
     } = parsed.data
     
-    // 3. Validasi tanggal tidak boleh masa lalu
-    const today = new Date().toISOString().split('T')[0]
+    // 3. Validasi tanggal tidak boleh masa lalu (zona waktu WIB)
+    const today = todayJakarta()
     if (reservation_date < today) {
       return NextResponse.json(
         { error: 'Tanggal reservasi tidak boleh di masa lalu' },
@@ -79,7 +86,11 @@ export async function POST(request) {
     if (error) {
       console.error('create_reservation error:', error)
       
-      // Terjemahkan error PostgreSQL ke pesan ramah
+      const message = error.message || ''
+      
+      // Terjemahkan error PostgreSQL ke pesan ramah.
+      // Urutan penting: jangan menebak dari kode saja, karena banyak aturan
+      // memakai kode 23514 dengan pesan berbeda.
       if (error.code === '23P01') {
         return NextResponse.json(
           { error: 'Meja sudah dipesan pada jadwal tersebut. Silakan pilih meja atau waktu lain.' },
@@ -87,24 +98,45 @@ export async function POST(request) {
         )
       }
       
-      if (error.code === '23514' || error.message?.includes('minimum')) {
+      if (message.includes('minimal pembelian')) {
         return NextResponse.json(
-          { error: 'Total pembelian belum mencapai minimum Rp300.000. Silakan tambah menu.' },
+          { error: 'Total pembelian belum mencapai minimum. Silakan tambah menu.' },
           { status: 422 }
         )
       }
       
-      if (error.code === '23514' || error.message?.includes('capacity')) {
+      if (message.includes('melebihi kapasitas')) {
         return NextResponse.json(
           { error: 'Kapasitas meja tidak cukup untuk jumlah tamu tersebut.' },
           { status: 422 }
         )
       }
       
-      if (error.message?.includes('outside operating hours')) {
+      if (message.includes('jam operasional') || message.includes('Restoran tutup')) {
         return NextResponse.json(
           { error: 'Waktu reservasi di luar jam operasional restoran.' },
           { status: 422 }
+        )
+      }
+      
+      if (message.includes('masa lalu')) {
+        return NextResponse.json(
+          { error: 'Tanggal reservasi tidak boleh di masa lalu.' },
+          { status: 422 }
+        )
+      }
+      
+      if (message.includes('Pilih minimal satu menu')) {
+        return NextResponse.json(
+          { error: 'Pilih minimal satu menu untuk reservasi.' },
+          { status: 422 }
+        )
+      }
+      
+      if (error.code === '42501') {
+        return NextResponse.json(
+          { error: 'Hanya pelanggan yang dapat membuat reservasi.' },
+          { status: 403 }
         )
       }
       
@@ -139,35 +171,27 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   
   try {
-    // 1. Cek login
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Silakan login terlebih dahulu' },
-        { status: 401 }
-      )
-    }
+    // 1. Cek login + status akun (semua role boleh membaca sesuai RLS)
+    const auth = await requireRole(supabase, ['pelanggan', 'staf', 'admin'])
+    if (auth.error) return auth.error
     
-    // 2. Cek role user
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    
-    if (!profile) {
-      return NextResponse.json(
-        { error: 'Profil tidak ditemukan' },
-        { status: 404 }
-      )
-    }
-    
-    // 3. Query parameters
+    // 2. Query parameters
     const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const offset = parseInt(searchParams.get('offset') || '0')
+    if (status && !ALLOWED_STATUS.includes(status)) {
+      return NextResponse.json(
+        { error: 'Status tidak valid', allowed: ALLOWED_STATUS },
+        { status: 400 }
+      )
+    }
     
-    // 4. Build query
+    const parsedLimit = parseInt(searchParams.get('limit') || '20', 10)
+    const parsedOffset = parseInt(searchParams.get('offset') || '0', 10)
+    const limit = Number.isInteger(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 100)
+      : 20
+    const offset = Number.isInteger(parsedOffset) ? Math.max(parsedOffset, 0) : 0
+    
+    // 3. Build query
     let query = supabase
       .from('reservations')
       .select(`
@@ -191,8 +215,8 @@ export async function GET(request) {
     
     // Pelanggan hanya lihat reservasi sendiri
     // Staf dan admin bisa lihat semua
-    if (profile.role === 'pelanggan') {
-      query = query.eq('customer_id', user.id)
+    if (auth.profile.role === 'pelanggan') {
+      query = query.eq('customer_id', auth.user.id)
     }
     
     // Filter by status (optional)
@@ -206,7 +230,7 @@ export async function GET(request) {
       .order('start_time', { ascending: false })
       .range(offset, offset + limit - 1)
     
-    const { data, error, count } = await query
+    const { data, error } = await query
     
     if (error) {
       console.error('Error fetching reservations:', error)
@@ -216,7 +240,7 @@ export async function GET(request) {
       )
     }
     
-    // 5. Format response
+    // 4. Format response
     const formattedData = data.map(reservation => ({
       id: reservation.id,
       reservation_code: reservation.reservation_code,
@@ -228,12 +252,14 @@ export async function GET(request) {
       status: reservation.status,
       notes: reservation.notes,
       created_at: reservation.created_at,
-      table: {
-        id: reservation.dining_tables.id,
-        code: reservation.dining_tables.code,
-        capacity: reservation.dining_tables.capacity,
-        area: reservation.dining_tables.area,
-      },
+      table: reservation.dining_tables
+        ? {
+            id: reservation.dining_tables.id,
+            code: reservation.dining_tables.code,
+            capacity: reservation.dining_tables.capacity,
+            area: reservation.dining_tables.area,
+          }
+        : null,
     }))
     
     return NextResponse.json({

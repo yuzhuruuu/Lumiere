@@ -3,6 +3,7 @@
 
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth/require-role'
 
 export async function GET(request, { params }) {
   const supabase = await createClient()
@@ -10,14 +11,10 @@ export async function GET(request, { params }) {
   const { id } = await params
   
   try {
-    // 1. Cek login
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Silakan login terlebih dahulu' },
-        { status: 401 }
-      )
-    }
+    // 1. Cek login + status akun. Kepemilikan data tetap dijaga RLS:
+    //    pelanggan hanya bisa membaca reservasinya sendiri.
+    const auth = await requireRole(supabase, ['pelanggan', 'staf', 'admin'])
+    if (auth.error) return auth.error
     
     // 2. Ambil data reservasi dengan relasi lengkap
     const { data: reservation, error: reservationError } = await supabase
@@ -129,6 +126,13 @@ export async function GET(request, { params }) {
       payments = paymentsData || []
     }
     
+    // 5b. Riwayat perubahan status (dibuat otomatis oleh trigger database)
+    const { data: statusLogs } = await supabase
+      .from('reservation_status_logs')
+      .select('id, from_status, to_status, note, changed_by, created_at')
+      .eq('reservation_id', id)
+      .order('created_at', { ascending: true })
+    
     // 6. Format response
     const formattedReservation = {
       id: reservation.id,
@@ -185,6 +189,14 @@ export async function GET(request, { params }) {
         status: payment.status,
         reference_no: payment.reference_no,
         paid_at: payment.paid_at,
+      })),
+      status_logs: (statusLogs || []).map(log => ({
+        id: log.id,
+        from_status: log.from_status,
+        to_status: log.to_status,
+        note: log.note,
+        changed_by: log.changed_by,
+        created_at: log.created_at,
       })),
       barcode_data: {
         code: reservation.reservation_code,
