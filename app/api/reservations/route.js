@@ -6,8 +6,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createReservationSchema } from '@/lib/validations/reservation'
 import { requireRole } from '@/lib/auth/require-role'
-import { todayJakarta } from '@/lib/utils/date'
 import { calculateBill } from '@/lib/utils/bill'
+import { preflightReservation } from '@/lib/reservations/preflight'
+import { mapCreateReservationError } from '@/lib/reservations/errors'
 
 const ALLOWED_STATUS = [
   'menunggu_validasi',
@@ -55,15 +56,16 @@ export async function POST(request) {
       notes,
     } = parsed.data
     
-    // 3. Validasi tanggal tidak boleh masa lalu (zona waktu WIB)
-    const today = todayJakarta()
-    if (reservation_date < today) {
-      return NextResponse.json(
-        { error: 'Tanggal reservasi tidak boleh di masa lalu' },
-        { status: 400 }
-      )
+    // 3. Validasi awal: tanggal/jam, meja, kapasitas, jam operasional, menu,
+    //    dan minimum pembelian. Database tetap memeriksa ulang saat COMMIT.
+    const preflight = await preflightReservation(supabase, parsed.data)
+
+    if (preflight.error) {
+      return NextResponse.json(preflight.error.body, {
+        status: preflight.error.status,
+      })
     }
-    
+
     // 4. Panggil RPC create_reservation
     // RPC ini akan handle:
     // - Insert reservasi + items dalam satu transaksi
@@ -86,66 +88,13 @@ export async function POST(request) {
     
     if (error) {
       console.error('create_reservation error:', error)
-      
-      const message = error.message || ''
-      
-      // Terjemahkan error PostgreSQL ke pesan ramah.
-      // Urutan penting: jangan menebak dari kode saja, karena banyak aturan
-      // memakai kode 23514 dengan pesan berbeda.
-      if (error.code === '23P01') {
-        return NextResponse.json(
-          { error: 'Meja sudah dipesan pada jadwal tersebut. Silakan pilih meja atau waktu lain.' },
-          { status: 409 }
-        )
-      }
-      
-      if (message.includes('minimal pembelian')) {
-        return NextResponse.json(
-          { error: 'Total pembelian belum mencapai minimum. Silakan tambah menu.' },
-          { status: 422 }
-        )
-      }
-      
-      if (message.includes('melebihi kapasitas')) {
-        return NextResponse.json(
-          { error: 'Kapasitas meja tidak cukup untuk jumlah tamu tersebut.' },
-          { status: 422 }
-        )
-      }
-      
-      if (message.includes('jam operasional') || message.includes('Restoran tutup')) {
-        return NextResponse.json(
-          { error: 'Waktu reservasi di luar jam operasional restoran.' },
-          { status: 422 }
-        )
-      }
-      
-      if (message.includes('masa lalu')) {
-        return NextResponse.json(
-          { error: 'Tanggal reservasi tidak boleh di masa lalu.' },
-          { status: 422 }
-        )
-      }
-      
-      if (message.includes('Pilih minimal satu menu')) {
-        return NextResponse.json(
-          { error: 'Pilih minimal satu menu untuk reservasi.' },
-          { status: 422 }
-        )
-      }
-      
-      if (error.code === '42501') {
-        return NextResponse.json(
-          { error: 'Hanya pelanggan yang dapat membuat reservasi.' },
-          { status: 403 }
-        )
-      }
-      
-      // Error umum
-      return NextResponse.json(
-        { error: 'Gagal membuat reservasi. Silakan coba lagi.' },
-        { status: 500 }
-      )
+
+      const mapped = mapCreateReservationError(error, {
+        subtotal: preflight.subtotal,
+        minimumOrder: preflight.minimumOrder,
+      })
+
+      return NextResponse.json(mapped.body, { status: mapped.status })
     }
     
     // 5. Hitung rincian tagihan dari item yang benar-benar tersimpan di database.
@@ -153,7 +102,7 @@ export async function POST(request) {
     const [{ data: createdItems }, { data: billConfig }] = await Promise.all([
       supabase
         .from('reservation_items')
-        .select('subtotal')
+        .select('id, menu_item_id, quantity, unit_price, subtotal')
         .eq('reservation_id', data.id),
       supabase
         .from('restaurant_profile')
@@ -177,6 +126,13 @@ export async function POST(request) {
       {
         message: 'Reservasi berhasil dibuat',
         reservation: data,
+        items: (createdItems || []).map((item) => ({
+          id: item.id,
+          menu_item_id: item.menu_item_id,
+          quantity: item.quantity,
+          unit_price: parseFloat(item.unit_price),
+          subtotal: parseFloat(item.subtotal),
+        })),
         bill: {
           source: 'estimate',
           ...bill,

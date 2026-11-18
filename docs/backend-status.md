@@ -77,9 +77,16 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 
 ## 4. Aturan bisnis yang dijaga server/database
 
-- Benturan jadwal meja dijaga exclusion constraint (`23P01`), aman dari race condition.
-- Kapasitas meja, jam operasional, tanggal masa lalu divalidasi trigger.
-- Minimum pembelian dicek saat commit transaksi pembuatan reservasi.
+- Benturan jadwal meja dijaga exclusion constraint (`23P01`), aman dari race
+  condition dan sudah diuji dengan dua request paralel.
+- Kapasitas meja, jam operasional, tanggal masa lalu, durasi, dan jumlah tamu
+  divalidasi trigger database.
+- Route API menolak tanggal/jam yang sudah lewat pada hari yang sama sebelum
+  memanggil RPC; database tetap memeriksa ulang tanggal, jam operasional,
+  kapasitas, dan benturan saat commit.
+- Minimum pembelian dicek saat commit transaksi pembuatan reservasi; response
+  error menyertakan `subtotal`, `minimum_order`, dan `shortfall`.
+- Harga item dibekukan dari `menu_items` oleh trigger, bukan dari angka client.
 - Total tagihan dihitung database dari item, bukan angka dari client.
 - Pajak **10%** (`restaurant_profile.tax_percentage`) ditambahkan ke subtotal:
   `total_amount = subtotal + tax_amount`. DP default 50% dari total.
@@ -89,6 +96,9 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 - Semua tanggal bisnis memakai zona waktu **Asia/Jakarta (WIB)**.
 - Input pencarian dibersihkan sebelum masuk filter PostgREST.
 - Pesan error ke client selalu berbahasa Indonesia; detail internal hanya di log server.
+- Cek ketersediaan wajib login dan memakai agregat booking lintas pelanggan di
+  server. Hanya `table_id`/`start_time`/`duration_minutes` yang dibaca; data
+  kontak pelanggan tidak pernah dikembalikan.
 
 ---
 
@@ -96,6 +106,28 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 
 - `npm run build` ✅
 - `npx eslint .` ✅
+- Unit test Vitest: **5 file, 41 test lulus** (`npm test`)
+- Integration test database terhadap Supabase lokal: **19/19 lulus**
+  (`npm run test:integration`)
+  - reservasi + item + harga snapshot + status log
+  - kapasitas, jam operasional, tanggal masa lalu, durasi/jumlah tamu
+  - benturan jadwal, slot bersambung, meja berbeda, tanggal berbeda
+  - dua request paralel tidak menghasilkan double booking
+  - minimum order, rollback saat gagal, menu tidak tersedia, meja nonaktif
+  - RLS pelanggan lain dan request anonim
+- Integration test API terhadap Next.js + Supabase lokal: **11/11 lulus**
+  (`npm run test:integration:api`)
+  - cek ketersediaan wajib login
+  - reservasi lewat API menyimpan item dan pajak 10%
+  - detail reservasi mengembalikan item dan `barcode_data`
+  - meja yang sudah dipesan hilang dari ketersediaan, termasuk bagi pelanggan lain
+  - benturan jadwal `409`, kapasitas/minimum order `422`, input tidak valid `400`
+  - anonim `401` dan detail milik pelanggan lain `404`
+
+Integration test hanya boleh dijalankan terhadap Supabase dan aplikasi
+`localhost`/`127.0.0.1`; script menolak URL lain agar data production tidak
+tersentuh.
+
 - Query Supabase langsung (sesi staf/admin) ✅
   - daftar invoice + relasi reservasi/pembayaran
   - detail invoice + item + pembayaran
@@ -114,9 +146,12 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
    - bucket `restaurant-assets` ada
 4. Ubah `pending_timeout_minutes` dari `0` (nilai seed demo) menjadi `30`
    agar auto-cancel berfungsi.
-5. Opsional untuk nilai tambah:
+5. Sisa keputusan produk: PRD juga menyebut admin dapat membuat reservasi,
+   sedangkan route saat ini hanya mengizinkan `pelanggan` dan policy RLS
+   `reservations_insert_own` juga membatasi pelanggan. Perlu persetujuan
+   kebijakan sebelum menambah migration RLS baru.
+6. Opsional untuk nilai tambah:
    - rate limiting endpoint publik (butuh Redis/Upstash di serverless)
-   - automated test (Vitest/Playwright)
    - monitoring/log agregasi
 
 ---

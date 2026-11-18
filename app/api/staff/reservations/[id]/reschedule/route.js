@@ -10,7 +10,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
 import { rescheduleReservationSchema } from '@/lib/validations/staff'
-import { todayJakarta } from '@/lib/utils/date'
+import { nowJakartaTime, todayJakarta } from '@/lib/utils/date'
 
 const RESCHEDULABLE = ['menunggu_validasi', 'dikonfirmasi']
 
@@ -34,7 +34,7 @@ export async function PATCH(request, { params }) {
 
     const { data: current, error: currentError } = await supabase
       .from('reservations')
-      .select('id, status, reservation_code, reservation_date')
+      .select('id, status, reservation_code, reservation_date, start_time')
       .eq('id', id)
       .single()
 
@@ -56,9 +56,25 @@ export async function PATCH(request, { params }) {
 
     const updates = { ...parsed.data }
 
-    if (updates.reservation_date && updates.reservation_date < todayJakarta()) {
+    const effectiveDate = updates.reservation_date || current.reservation_date
+    const effectiveTime = String(updates.start_time || current.start_time).slice(
+      0,
+      5
+    )
+
+    if (effectiveDate < todayJakarta()) {
       return NextResponse.json(
-        { error: 'Tanggal reservasi tidak boleh di masa lalu' },
+        { error: 'Tanggal reservasi tidak boleh di masa lalu.' },
+        { status: 422 }
+      )
+    }
+
+    if (
+      effectiveDate === todayJakarta() &&
+      effectiveTime <= nowJakartaTime()
+    ) {
+      return NextResponse.json(
+        { error: 'Waktu reservasi hari ini sudah lewat. Pilih jam lain.' },
         { status: 422 }
       )
     }
