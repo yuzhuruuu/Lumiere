@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createReservationSchema } from '@/lib/validations/reservation'
 import { requireRole } from '@/lib/auth/require-role'
 import { todayJakarta } from '@/lib/utils/date'
+import { calculateBill } from '@/lib/utils/bill'
 
 const ALLOWED_STATUS = [
   'menunggu_validasi',
@@ -147,11 +148,39 @@ export async function POST(request) {
       )
     }
     
-    // 5. Return data reservasi yang berhasil dibuat
+    // 5. Hitung rincian tagihan dari item yang benar-benar tersimpan di database.
+    //    Subtotal sudah dihitung trigger dari harga menu, bukan dari client.
+    const [{ data: createdItems }, { data: billConfig }] = await Promise.all([
+      supabase
+        .from('reservation_items')
+        .select('subtotal')
+        .eq('reservation_id', data.id),
+      supabase
+        .from('restaurant_profile')
+        .select('tax_percentage, dp_percentage')
+        .eq('id', 1)
+        .single(),
+    ])
+
+    const subtotal = (createdItems || []).reduce(
+      (acc, item) => acc + parseFloat(item.subtotal),
+      0
+    )
+    const bill = calculateBill(
+      subtotal,
+      billConfig?.tax_percentage ?? 10,
+      billConfig?.dp_percentage ?? 50
+    )
+
+    // 6. Return data reservasi yang berhasil dibuat
     return NextResponse.json(
       {
         message: 'Reservasi berhasil dibuat',
         reservation: data,
+        bill: {
+          source: 'estimate',
+          ...bill,
+        },
       },
       { status: 201 }
     )
@@ -211,7 +240,7 @@ export async function GET(request) {
           capacity,
           area
         )
-      `)
+      `, { count: 'exact' })
     
     // Pelanggan hanya lihat reservasi sendiri
     // Staf dan admin bisa lihat semua
@@ -230,7 +259,7 @@ export async function GET(request) {
       .order('start_time', { ascending: false })
       .range(offset, offset + limit - 1)
     
-    const { data, error } = await query
+    const { data, error, count } = await query
     
     if (error) {
       console.error('Error fetching reservations:', error)
@@ -264,11 +293,11 @@ export async function GET(request) {
     
     return NextResponse.json({
       reservations: formattedData,
-      total: formattedData.length,
+      total: count ?? formattedData.length,
       pagination: {
         limit,
         offset,
-        has_more: formattedData.length === limit,
+        has_more: offset + formattedData.length < (count ?? 0),
       },
       filters: {
         status,

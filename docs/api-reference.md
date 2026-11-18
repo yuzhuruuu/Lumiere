@@ -19,7 +19,12 @@ otomatis terautentikasi.
 | `admin` | Semua akses staf + CRUD menu/meja/jam operasional + user + laporan |
 
 Semua pemeriksaan role dilakukan **di server** (`lib/auth/require-role.js`).
-Menyembunyikan tombol di UI saja tidak cukup.
+Menyembunyikan tombol di UI saja tidak cukup. Akun dengan `is_active = false`
+ditolak saat login, saat membuka dashboard, dan di semua endpoint API.
+
+Reservasi memakai aturan transisi status dari database:
+`menunggu_validasi → dikonfirmasi/ditolak/dibatalkan`,
+`dikonfirmasi → check_in/tidak_hadir/dibatalkan`, `check_in → selesai`.
 
 ---
 
@@ -79,6 +84,9 @@ Response berisi `available`, daftar `tables`, dan `alternatives` (slot jam lain)
 
 - Perhitungan total, minimum order, dan benturan jadwal dilakukan **database**
   lewat RPC `create_reservation(...)`.
+- Response menyertakan `bill` (estimasi): `subtotal`, `tax_percentage` (10%),
+  `tax_amount`, `total_amount`, `dp_amount`. Angka resmi tetap dihitung
+  database saat `generate_invoice`.
 - Error `23P01` → jadwal bentrok; `23514` → aturan reservasi/minimum order.
 
 ### Riwayat & detail
@@ -86,7 +94,7 @@ Response berisi `available`, daftar `tables`, dan `alternatives` (slot jam lain)
 | Method | Path | Keterangan |
 |---|---|---|
 | GET | `/api/reservations` | Reservasi milik sendiri (staf/admin: semua) |
-| GET | `/api/reservations/[id]` | Detail + item + invoice + pembayaran + riwayat status |
+| GET | `/api/reservations/[id]` | Detail + item + `bill` + invoice + pembayaran + riwayat status |
 | PATCH | `/api/reservations/[id]/cancel` | Batalkan reservasi sendiri (`menunggu_validasi`/`dikonfirmasi`) |
 
 Body pembatalan (opsional):
@@ -143,6 +151,26 @@ Body pembatalan (opsional):
 { "action": "reject", "rejection_reason": "Meja penuh pada jam tersebut" }
 ```
 
+### Ubah jadwal (reschedule)
+
+`PATCH /api/staff/reservations/[id]/reschedule`
+
+Body boleh sebagian:
+
+```json
+{
+  "reservation_date": "2026-11-21",
+  "start_time": "20:00",
+  "duration_minutes": 120,
+  "guest_count": 6,
+  "table_id": 9208,
+  "notes": "Diubah lewat telepon"
+}
+```
+
+Hanya untuk status `menunggu_validasi` / `dikonfirmasi`. Database memeriksa jam
+operasional, kapasitas, meja aktif, dan benturan jadwal.
+
 ### Check-in
 
 ```json
@@ -160,6 +188,19 @@ Body pembatalan (opsional):
 ```
 
 Database memeriksa kapasitas, jam operasional, dan benturan jadwal.
+
+### Tagihan (invoice)
+
+| Method | Path | Keterangan |
+|---|---|---|
+| GET | `/api/staff/invoices?payment_status=belum_dibayar` | Daftar tagihan + sisa bayar |
+| GET | `/api/staff/invoices/[id]` | Detail tagihan, item reservasi, dan pembayaran |
+| PATCH | `/api/staff/invoices/[id]/cancel` | Batalkan tagihan yang belum dibayar |
+
+Aturan pembatalan tagihan:
+- Hanya tagihan `belum_dibayar` tanpa pembayaran berhasil/menunggu.
+- Reservasi harus sudah `dibatalkan` atau `tidak_hadir`.
+- Tagihan `dp_dibayar`/`lunas` tidak bisa dibatalkan lewat API (refund manual).
 
 ### Catat pembayaran
 
@@ -179,6 +220,8 @@ Database memeriksa kapasitas, jam operasional, dan benturan jadwal.
 
 - `idempotency_key` **wajib** dan unik → mencegah pencatatan ganda.
 - Status invoice (`belum_dibayar → dp_dibayar → lunas`) diperbarui trigger database.
+- Pembayaran ditolak jika invoice sudah `dibatalkan`.
+- Daftar pembayaran: `GET /api/staff/payments?invoice_id=...&status=berhasil&date=2026-11-18&limit=50&offset=0`
 
 ### Status pesanan
 
@@ -188,6 +231,16 @@ Database memeriksa kapasitas, jam operasional, dan benturan jadwal.
 
 Transisi yang diizinkan: `menunggu → disiapkan → disajikan → selesai`
 (dan `dibatalkan` dari ketiga status aktif).
+
+### Ringkasan operasional
+
+`GET /api/staff/summary`
+
+Berisi angka siap pakai untuk dashboard staf:
+- `reservations.pending_validation`, `reservations.today`, `reservations.currently_checked_in`
+- `orders.waiting`, `orders.preparing`
+- `invoices.unpaid`
+- `revenue_today` (pembayaran berhasil hari ini, WIB)
 
 ---
 

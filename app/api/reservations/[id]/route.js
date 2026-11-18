@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
+import { calculateBill } from '@/lib/utils/bill'
 
 export async function GET(request, { params }) {
   const supabase = await createClient()
@@ -132,6 +133,39 @@ export async function GET(request, { params }) {
       .select('id, from_status, to_status, note, changed_by, created_at')
       .eq('reservation_id', id)
       .order('created_at', { ascending: true })
+
+    // 5c. Konfigurasi pajak & DP untuk rincian tagihan
+    const { data: billConfig } = await supabase
+      .from('restaurant_profile')
+      .select('tax_percentage, dp_percentage')
+      .eq('id', 1)
+      .single()
+
+    const taxPercentage = parseFloat(billConfig?.tax_percentage ?? 10)
+    const dpPercentage = parseFloat(billConfig?.dp_percentage ?? 50)
+    const itemsSubtotal = reservation.reservation_items.reduce(
+      (acc, item) => acc + parseFloat(item.subtotal),
+      0
+    )
+    const estimate = calculateBill(itemsSubtotal, taxPercentage, dpPercentage)
+
+    // Jika invoice sudah dibuat, angka invoice (dihitung database) yang dipakai.
+    const bill = invoice
+      ? {
+          source: 'invoice',
+          subtotal: parseFloat(invoice.subtotal),
+          tax_percentage: taxPercentage,
+          tax_amount: parseFloat(invoice.tax_amount),
+          total_amount: parseFloat(invoice.total_amount),
+          dp_percentage: dpPercentage,
+          dp_amount: parseFloat(invoice.dp_amount),
+          payment_status: invoice.payment_status,
+        }
+      : {
+          source: 'estimate',
+          ...estimate,
+          payment_status: null,
+        }
     
     // 6. Format response
     const formattedReservation = {
@@ -181,6 +215,7 @@ export async function GET(request, { params }) {
         payment_status: invoice.payment_status,
         issued_at: invoice.issued_at,
       } : null,
+      bill,
       payments: payments.map(payment => ({
         id: payment.id,
         type: payment.type,
