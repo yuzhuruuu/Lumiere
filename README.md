@@ -139,7 +139,7 @@ proxy.js          # Refresh sesi & proteksi route
 | Nama | Peran | GitHub | Fokus |
 |---|---|---|---|
 | Herdi Rizky | Front End | [@IkiBOYY21](https://github.com/IkiBOYY21) — Collaborator | Halaman dan antarmuka pengguna |
-| Annisa Yusri | Back End | – | API, database, RLS, dan integrasi Supabase |
+| Annisa Yusri | Back End | [@yuzhuruuu](https://github.com/yuzhuruuu) | API, database, RLS, dan integrasi Supabase |
 | Mahendra | Product Manager | [@mahendrarq28](https://github.com/mahendrarq28) — Collaborator | PRD, koordinasi, dan pengawasan deliverable |
 
 ## Deployment & Catatan Produksi
