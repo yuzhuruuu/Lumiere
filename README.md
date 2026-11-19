@@ -147,12 +147,6 @@ proxy.js          # Refresh sesi & proteksi route
 - Vercel deploy otomatis dari `main`.
 - Setiap migration baru harus tetap dijalankan di Supabase production melalui
   SQL Editor bila Supabase GitHub integration tidak menjalankannya.
-- Untuk mengaktifkan auto-cancel 30 menit:
-
-```sql
-UPDATE restaurant_profile SET pending_timeout_minutes = 30 WHERE id = 1;
-```
-
 - Pastikan bucket Storage `restaurant-assets` tersedia bila upload foto dipakai.
 
 ## Dokumentasi
