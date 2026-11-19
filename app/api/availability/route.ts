@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createSupabaseJs } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { requireRole } from "@/lib/auth/require-role";
 import { timeToMinutes } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
+  const supabase = await createClient();
+  const auth = await requireRole(supabase, ["pelanggan", "staf", "admin"]);
+  if (auth.error) return auth.error;
+
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date");
   const startTime = searchParams.get("startTime");
@@ -16,12 +21,9 @@ export async function GET(request: NextRequest) {
   const reqStart = timeToMinutes(startTime);
   const reqEnd = reqStart + duration;
 
-  // Gunakan service_role jika dikonfigurasi agar benturan lintas pelanggan terdeteksi,
-  // atau fallback ke client session (database constraint no_double_booking tetap menjaga saat submit).
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const client = serviceKey
-    ? createSupabaseJs(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
-    : await createClient();
+  // Agregat benturan lintas pelanggan dibaca lewat admin client yang sudah
+  // disetujui. Hanya table_id/start_time/duration_minutes yang diambil.
+  const client = getSupabaseAdmin();
 
   const { data, error } = await client
     .from("reservations")

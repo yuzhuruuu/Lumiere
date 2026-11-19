@@ -323,7 +323,7 @@ export default async function HomePage() {
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
             <div>
               <span className="text-xs font-serif font-bold uppercase tracking-[0.25em] text-[#C8A96A]">
-                ✦ Chef's Selection ✦
+                ✦ Chef&apos;s Selection ✦
               </span>
               <h2 className="font-serif text-3xl sm:text-5xl font-bold text-[#F7F6F1] mt-1">
                 Featured Culinary Creations

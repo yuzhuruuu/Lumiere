@@ -117,7 +117,7 @@ export default function HomeHeroInteractive({
           {/* Monumental Display Headline */}
           <div className="space-y-3">
             <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold tracking-tight text-[#F7F6F1] leading-[0.98]">
-              L'Arte della <br />
+              L&apos;Arte della <br />
               <span className="italic font-normal text-[#C8A96A] font-serif inline-block hover:scale-[1.01] transition-transform">
                 Cucina Italiana.
               </span>
@@ -162,7 +162,7 @@ export default function HomeHeroInteractive({
           {/* Interactive Dish Degustation Tabs */}
           <div className="space-y-2">
             <div className="text-[10px] uppercase font-serif tracking-[0.2em] text-[#C8A96A]">
-              ✦ Chef's Tasting Selection (Select Course to Preview)
+              ✦ Chef&apos;s Tasting Selection (Select Course to Preview)
             </div>
             <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[#051511]/90 border border-[#C8A96A]/25">
               {DISH_HIGHLIGHTS.map((dish) => {

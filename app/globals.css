@@ -1,21 +1,139 @@
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
 }
 
-html,
+html {
+  scroll-behavior: smooth;
+}
+
 body {
-  max-width: 100vw;
+  background-color: #071F1A;
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(19, 78, 67, 0.3) 0%, transparent 55%),
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+  color: #F7F6F1;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  color: #333;
-  background: #fff;
+/* Page Transition Animation (Silk Deceleration Curve) */
+@keyframes pageEnter {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+.animate-page-enter {
+  animation: pageEnter 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Modern View Transitions API Support */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: 180ms cubic-bezier(0.4, 0, 1, 1) both fadeOut;
+}
+
+::view-transition-new(root) {
+  animation: 320ms cubic-bezier(0, 0, 0.2, 1) 40ms both fadeIn;
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Custom luxury scrollbar (Dark Italian Bottle Green & Gold) */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #04120F;
+}
+::-webkit-scrollbar-thumb {
+  background: #134E43;
+  border-radius: 9999px;
+  border: 1px solid rgba(200, 169, 106, 0.3);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C8A96A;
+}
+
+/* Anti-AI Slop Luxury Italian Component Layer */
+@layer components {
+  /* Kartu Kaca Velvet Hijau Zamrud Gelap & Emas */
+  .glass-card {
+    @apply bg-[#0B2822]/80 backdrop-blur-2xl border border-[#C8A96A]/20 rounded-3xl transition-all duration-300 ease-out;
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
+  }
+  .glass-card:hover {
+    @apply border-[#C8A96A]/45 -translate-y-1;
+    box-shadow: 0 20px 50px 0 rgba(0, 0, 0, 0.8), 0 0 30px rgba(200, 169, 106, 0.08);
+  }
+  .glass-card-interactive {
+    @apply bg-[#0B2822]/80 backdrop-blur-2xl border border-[#C8A96A]/20 rounded-3xl transition-all duration-300 ease-out cursor-pointer;
+    box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.6);
+  }
+  .glass-card-interactive:hover {
+    @apply border-[#C8A96A]/60 -translate-y-1.5;
+    box-shadow: 0 24px 60px 0 rgba(0, 0, 0, 0.85), 0 0 35px rgba(200, 169, 106, 0.15);
+  }
+
+  /* Form Input Dark Bottle Green */
+  .input-dark {
+    @apply w-full rounded-2xl bg-[#051511]/90 border border-[#C8A96A]/25 px-4 py-3.5 text-sm text-[#F7F6F1] placeholder:text-[#A2B8AF]/50 focus:outline-none focus:border-[#C8A96A] focus:ring-2 focus:ring-[#C8A96A]/25 transition-all duration-200 shadow-inner;
+  }
+
+  /* Tombol Utama: Warm Champagne Brass (Tactile Satin Click) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-[#C8A96A] via-[#D6B87B] to-[#B39355] px-7 py-3.5 text-sm font-semibold text-[#071F1A] hover:brightness-105 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-xl shadow-[#C8A96A]/20 hover:shadow-2xl hover:shadow-[#C8A96A]/35 cursor-pointer;
+  }
+
+  /* Tombol Sekunder: Frosted Dark Pine Velvet */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2.5 rounded-2xl bg-[#09251F]/90 hover:bg-[#0E342B] border border-[#C8A96A]/30 hover:border-[#C8A96A]/60 px-6 py-3.5 text-sm font-medium text-[#F7F6F1] hover:text-[#C8A96A] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 backdrop-blur-md cursor-pointer;
+  }
+
+  /* Tombol Outline Emas */
+  .btn-outline-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-2xl border border-[#C8A96A]/60 bg-[#071F1A]/70 hover:bg-[#C8A96A]/15 px-6 py-3 text-sm font-semibold text-[#C8A96A] hover:border-[#C8A96A] active:scale-[0.98] transition-all duration-200 backdrop-blur-md cursor-pointer;
+  }
+
+  /* Badges Elegan */
+  .badge-emerald {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-serif font-semibold bg-[#E6F0E9]/10 text-[#E6F0E9] border border-[#E6F0E9]/20 tracking-wider;
+  }
+  .badge-gold {
+    @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-serif font-semibold bg-[#C8A96A]/15 text-[#C8A96A] border border-[#C8A96A]/35 tracking-[0.2em] uppercase;
+  }
+}
+
+/* Accessibility: Support reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
