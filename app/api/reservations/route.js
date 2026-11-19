@@ -25,9 +25,12 @@ export async function POST(request) {
   const supabase = await createClient()
   
   try {
-    // 1. Cek login + role (hanya pelanggan; RLS juga membatasi)
-    const auth = await requireRole(supabase, ['pelanggan'])
+    // 1. Cek login + role.
+    // Pelanggan membuat reservasi atas nama dirinya sendiri.
+    // Admin membuat reservasi atas nama pelanggan terdaftar (customer_id wajib).
+    const auth = await requireRole(supabase, ['pelanggan', 'admin'])
     if (auth.error) return auth.error
+    const isAdmin = auth.profile.role === 'admin'
     
     // 2. Validasi input
     const body = await request.json()
@@ -54,7 +57,42 @@ export async function POST(request) {
       table_id,
       items,
       notes,
+      customer_id,
     } = parsed.data
+
+    if (isAdmin && !customer_id) {
+      return NextResponse.json(
+        { error: 'Admin wajib memilih pelanggan untuk reservasi ini' },
+        { status: 400 }
+      )
+    }
+    if (!isAdmin && customer_id) {
+      return NextResponse.json(
+        { error: 'Pelanggan tidak boleh mengirim ID pelanggan lain' },
+        { status: 400 }
+      )
+    }
+
+    if (isAdmin) {
+      const { data: customer, error: customerError } = await supabase
+        .from('profiles')
+        .select('id, role, is_active')
+        .eq('id', customer_id)
+        .maybeSingle()
+
+      if (customerError || !customer) {
+        return NextResponse.json(
+          { error: 'Pelanggan tidak ditemukan' },
+          { status: 404 }
+        )
+      }
+      if (customer.role !== 'pelanggan' || !customer.is_active) {
+        return NextResponse.json(
+          { error: 'Reservasi hanya bisa dibuat untuk pelanggan yang aktif' },
+          { status: 422 }
+        )
+      }
+    }
     
     // 3. Validasi awal: tanggal/jam, meja, kapasitas, jam operasional, menu,
     //    dan minimum pembelian. Database tetap memeriksa ulang saat COMMIT.
@@ -73,7 +111,7 @@ export async function POST(request) {
     // - Cek kapasitas meja
     // - Cek bentrokan jadwal
     // - Auto-generate reservation_code
-    const { data, error } = await supabase.rpc('create_reservation', {
+    const rpcParams = {
       p_contact_name: contact_name,
       p_contact_phone: contact_phone,
       p_contact_email: contact_email,
@@ -84,7 +122,14 @@ export async function POST(request) {
       p_table_id: table_id,
       p_items: items,
       p_notes: notes || null,
-    })
+    }
+
+    const { data, error } = isAdmin
+      ? await supabase.rpc('create_reservation_for_customer', {
+          p_customer_id: customer_id,
+          ...rpcParams,
+        })
+      : await supabase.rpc('create_reservation', rpcParams)
     
     if (error) {
       console.error('create_reservation error:', error)

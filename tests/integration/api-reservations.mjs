@@ -3,7 +3,7 @@
 // yang terhubung ke Supabase lokal.
 //
 // Prasyarat:
-// - Supabase lokal berjalan (migration 1-4 sudah diterapkan)
+// - Supabase lokal berjalan (migration 1-6 sudah diterapkan)
 // - Next.js dev server berjalan dengan env Supabase lokal
 //
 // Script menolak URL non-localhost. Tidak ada data production yang disentuh.
@@ -36,6 +36,7 @@ const stamp = Date.now().toString(36).toUpperCase()
 const password = 'LumiereTest#2026'
 const emailA = `api-test-a-${stamp.toLowerCase()}@lumiere.test`
 const emailB = `api-test-b-${stamp.toLowerCase()}@lumiere.test`
+const emailAdmin = `api-test-admin-${stamp.toLowerCase()}@lumiere.test`
 
 const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -190,10 +191,27 @@ async function main() {
   assertNoError(userBResult, 'create user B')
   await waitForProfile(userBResult.data.user.id)
 
+  const adminUserResult = await admin.auth.admin.createUser({
+    email: emailAdmin,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: 'API Test Admin', phone: '081234567813' },
+  })
+  assertNoError(adminUserResult, 'create admin user')
+  await waitForProfile(adminUserResult.data.user.id)
+  const { error: adminRoleError } = await admin
+    .from('profiles')
+    .update({ role: 'admin', is_active: true })
+    .eq('id', adminUserResult.data.user.id)
+  assertNoError({ error: adminRoleError }, 'set admin role')
+
   const clientA = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const clientB = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  const clientAdmin = createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
@@ -210,6 +228,13 @@ async function main() {
   })
   assertNoError(loginB, 'login B')
   const cookieB = buildCookie(loginB.data.session)
+
+  const loginAdmin = await clientAdmin.auth.signInWithPassword({
+    email: emailAdmin,
+    password,
+  })
+  assertNoError(loginAdmin, 'login admin')
+  const cookieAdmin = buildCookie(loginAdmin.data.session)
 
   const date = '2099-06-01'
   const startTime = '19:00'
@@ -424,6 +449,31 @@ async function main() {
     })
 
     assert.equal(response.status, 404)
+  })
+
+  await test('admin dapat membuat reservasi untuk pelanggan lewat API', async () => {
+    const response = await request('/api/reservations', {
+      method: 'POST',
+      cookie: cookieAdmin,
+      body: {
+        ...payload,
+        customer_id: userAResult.data.user.id,
+        reservation_date: '2099-06-10',
+      },
+    })
+
+    assert.equal(response.status, 201)
+    assert.equal(response.body.reservation.customer_id, userAResult.data.user.id)
+  })
+
+  await test('admin wajib memilih pelanggan', async () => {
+    const response = await request('/api/reservations', {
+      method: 'POST',
+      cookie: cookieAdmin,
+      body: { ...payload, customer_id: undefined, reservation_date: '2099-06-11' },
+    })
+
+    assert.equal(response.status, 400)
   })
 
   console.log('')
