@@ -6,7 +6,7 @@ supaya tidak pernah membuat data uji di production.
 
 ## Prasyarat
 
-1. Supabase lokal berjalan dan migration 1–5 sudah diterapkan.
+1. Supabase lokal berjalan dan migration 1–6 sudah diterapkan.
 2. Untuk `api-reservations.mjs` dan `staff-reservations.mjs`, jalankan Next.js
    dengan environment Supabase lokal, misalnya:
 
@@ -42,7 +42,8 @@ npm run test:integration:staff
 - `reservations.mjs`: reservasi + item + harga snapshot, kapasitas, jam
   operasional, tanggal/durasi/jumlah tamu, reservasi hari ini yang jamnya sudah
   lewat, reschedule ke jam lewat, minimum order, menu nonaktif, meja nonaktif,
-  benturan jadwal, slot bersambung, dua request paralel, status log, dan RLS.
+  benturan jadwal, slot bersambung, dua request paralel, status log, RLS,
+  dan admin membuat reservasi untuk pelanggan terdaftar.
 - `api-reservations.mjs`: login, cek ketersediaan lintas pelanggan, create +
   tagihan 10% pajak, detail + barcode, `409` benturan, `422` kapasitas/minimum
   order, `400` input tidak valid, anonim `401`, dan detail milik pelanggan lain

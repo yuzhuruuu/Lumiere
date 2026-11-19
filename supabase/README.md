@@ -19,6 +19,7 @@ Migration baru yang akan diterapkan pada deployment berikutnya:
 | Version | Name |
 |---|---|
 | `20261118000001` | `reservation_same_day_time_guard` |
+| `20261119000001` | `admin_create_reservation_for_customer` |
 
 Karena itu, integrasi Supabase tidak akan menjalankan ulang migration lama
 tersebut di project production.

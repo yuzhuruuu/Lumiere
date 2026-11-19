@@ -116,8 +116,15 @@ dibaca; tidak ada data kontak pelanggan yang dikembalikan.
 }
 ```
 
+Untuk admin, tambahkan `"customer_id": "uuid-profil-pelanggan"` ke body di atas.
+
+- Role `pelanggan` membuat reservasi atas nama dirinya sendiri. Role `admin`
+  boleh membuat reservasi **atas nama pelanggan terdaftar** sesuai PRD 3.3:
+  kirim field `customer_id` (UUID profil pelanggan). Admin tanpa `customer_id`
+  mendapat `400`; pelanggan yang mengirim `customer_id` juga ditolak.
 - Perhitungan total, minimum order, dan benturan jadwal dilakukan **database**
-  lewat RPC `create_reservation(...)`.
+  lewat RPC `create_reservation(...)` untuk pelanggan dan
+  `create_reservation_for_customer(...)` untuk admin.
 - Server juga melakukan preflight untuk pesan error yang ramah: tanggal/jam
   tidak valid, tanggal/jam sudah lewat, meja tidak aktif, kapasitas kurang,
   di luar jam operasional, menu tidak tersedia, dan minimum order. Database

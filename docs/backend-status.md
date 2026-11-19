@@ -40,7 +40,7 @@ Jumlah route API: **35 file route** di `app/api/` (sekitar 45 method HTTP).
 | Profil restoran | – (1 baris) | ✅ | ✅ | – |
 | Jam operasional | – (7 baris) | ✅ | ✅ (bulk) | – |
 | Pengguna | – (via Auth) | ✅ | ✅ (role/status) | – |
-| Reservasi | ✅ (pelanggan) | ✅ | ✅ (status/jadwal) | – (hanya status) |
+| Reservasi | ✅ (pelanggan/admin) | ✅ | ✅ (status/jadwal) | – (hanya status) |
 | Item reservasi | ✅ (saat membuat reservasi) | ✅ | – | – |
 | Pesanan | ✅ (otomatis saat invoice) | ✅ | ✅ (status) | – |
 | Invoice | ✅ (`generate_invoice`) | ✅ | ✅ (batalkan) | – |
@@ -92,9 +92,9 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   `total_amount = subtotal + tax_amount`. DP default 50% dari total.
 - Pembayaran wajib `idempotency_key` unik; kelebihan bayar ditolak trigger.
 - Role/status akun hanya bisa diubah admin; admin terakhir tidak bisa dinonaktifkan.
-- Keputusan produk: pembuatan reservasi adalah alur pelanggan. Admin/staf tidak
-  membuat reservasi baru; mereka memvalidasi, menjadwalkan ulang, memindahkan
-  meja, dan memproses reservasi yang sudah ada.
+- Sesuai PRD 3.3, admin juga boleh membuat reservasi **atas nama pelanggan
+  terdaftar** lewat `customer_id`. Pelanggan tetap membuat reservasi untuk
+  dirinya sendiri; staf tidak membuat reservasi baru.
 - Akun `is_active = false` ditolak saat login, dashboard, dan semua API.
 - Semua tanggal bisnis memakai zona waktu **Asia/Jakarta (WIB)**.
 - Input pencarian dibersihkan sebelum masuk filter PostgREST.
@@ -110,16 +110,17 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 - `npm run build` ✅
 - `npm run lint` ✅
 - Unit test Vitest: **5 file, 41 test lulus** (`npm test`)
-- Integration test database terhadap Supabase lokal: **21/21 lulus**
+- Integration test database terhadap Supabase lokal: **23/23 lulus**
   (`npm run test:integration`)
   - reservasi + item + harga snapshot + status log
   - kapasitas, jam operasional, tanggal masa lalu, durasi/jumlah tamu
   - reservasi hari ini dengan jam sudah lewat, termasuk reschedule lewat trigger
+  - admin membuat reservasi untuk pelanggan terdaftar; pelanggan ditolak memakai RPC admin
   - benturan jadwal, slot bersambung, meja berbeda, tanggal berbeda
   - dua request paralel tidak menghasilkan double booking
   - minimum order, rollback saat gagal, menu tidak tersedia, meja nonaktif
   - RLS pelanggan lain dan request anonim
-- Integration test API terhadap Next.js + Supabase lokal: **11/11 lulus**
+- Integration test API terhadap Next.js + Supabase lokal: **13/13 lulus**
   (`npm run test:integration:api`)
   - cek ketersediaan wajib login
   - reservasi lewat API menyimpan item dan pajak 10%
@@ -127,6 +128,7 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   - meja yang sudah dipesan hilang dari ketersediaan, termasuk bagi pelanggan lain
   - benturan jadwal `409`, kapasitas/minimum order `422`, input tidak valid `400`
   - anonim `401` dan detail milik pelanggan lain `404`
+  - admin membuat reservasi untuk pelanggan lewat API (`customer_id`)
 - Integration test alur staf: **18/18 lulus**
   (`npm run test:integration:staff`)
   - pencarian kode barcode, validasi setuju/tolak dengan alasan
@@ -158,8 +160,9 @@ tersentuh.
    - bucket `restaurant-assets` ada
 4. Ubah `pending_timeout_minutes` dari `0` (nilai seed demo) menjadi `30`
    agar auto-cancel berfungsi.
-5. Keputusan produk sudah diambil: admin/staf tidak membuat reservasi baru;
-   route dan RLS tetap pelanggan-only. Tidak perlu migration RLS admin.
+5. Migration 6 sudah menambah RPC `create_reservation_for_customer(...)` agar
+   admin dapat membuat reservasi atas nama pelanggan. Pastikan migration ini
+   ikut terpasang di produksi.
 6. Opsional untuk nilai tambah:
    - rate limiting endpoint publik (butuh Redis/Upstash di serverless)
    - monitoring/log agregasi
