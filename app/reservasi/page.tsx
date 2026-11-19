@@ -78,6 +78,11 @@ export default function ReservasiPage() {
   // Step 4 Notes
   const [notes, setNotes] = useState("");
 
+  // Admin membuat reservasi atas nama pelanggan terdaftar
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [customers, setCustomers] = useState<Profile[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+
   useEffect(() => {
     async function initData() {
       const {
@@ -112,12 +117,24 @@ export default function ReservasiPage() {
             .order("id", { ascending: true }),
         ]);
 
-      if (profRes.data) {
-        const p = profRes.data as Profile;
-        setContactName(p.full_name || "");
-        setContactPhone(p.phone || "");
-        setContactEmail(p.email || user.email || "");
+      const profile = profRes.data as Profile | null;
+      const admin = profile?.role === "admin";
+      setIsAdmin(admin);
+
+      if (admin) {
+        const { data: customerData } = await supabase
+          .from("profiles")
+          .select("id, full_name, email, phone, role, is_active")
+          .eq("role", "pelanggan")
+          .eq("is_active", true)
+          .order("full_name", { ascending: true });
+        setCustomers((customerData || []) as Profile[]);
+      } else if (profile) {
+        setContactName(profile.full_name || "");
+        setContactPhone(profile.phone || "");
+        setContactEmail(profile.email || user.email || "");
       }
+
       if (restRes.data) setRestaurant(restRes.data as RestaurantProfile);
       if (hoursRes.data) setHours(hoursRes.data as OperatingHour[]);
       if (tablesRes.data) setTables(tablesRes.data as DiningTable[]);
@@ -129,6 +146,16 @@ export default function ReservasiPage() {
 
     initData();
   }, []);
+
+  const handleCustomerChange = (id: string) => {
+    setSelectedCustomerId(id);
+    const customer = customers.find((c) => c.id === id);
+    if (customer) {
+      setContactName(customer.full_name || "");
+      setContactPhone(customer.phone || "");
+      setContactEmail(customer.email || "");
+    }
+  };
 
   // Operating hours untuk tanggal yang dipilih
   const selectedDayOperatingHour = useMemo(() => {
@@ -261,18 +288,28 @@ export default function ReservasiPage() {
       quantity: ci.quantity,
     }));
 
-    const { data, error: rpcError } = await supabase.rpc("create_reservation", {
-      p_contact_name: contactName.trim(),
-      p_contact_phone: contactPhone.trim(),
-      p_contact_email: contactEmail.trim(),
-      p_reservation_date: reservationDate,
-      p_start_time: startTime,
-      p_duration_minutes: durationMinutes,
-      p_guest_count: guestCount,
-      p_table_id: selectedTableId,
-      p_items: payloadItems,
-      p_notes: notes.trim() || null,
-    });
+    if (isAdmin && !selectedCustomerId) {
+      setError("Pilih pelanggan terlebih dahulu.");
+      setSubmitting(false);
+      return;
+    }
+
+    const { data, error: rpcError } = await supabase.rpc(
+      isAdmin ? "create_reservation_for_customer" : "create_reservation",
+      {
+        ...(isAdmin ? { p_customer_id: selectedCustomerId } : {}),
+        p_contact_name: contactName.trim(),
+        p_contact_phone: contactPhone.trim(),
+        p_contact_email: contactEmail.trim(),
+        p_reservation_date: reservationDate,
+        p_start_time: startTime,
+        p_duration_minutes: durationMinutes,
+        p_guest_count: guestCount,
+        p_table_id: selectedTableId,
+        p_items: payloadItems,
+        p_notes: notes.trim() || null,
+      }
+    );
 
     if (rpcError || !data) {
       setError(translateDbError(rpcError));
@@ -369,6 +406,30 @@ export default function ReservasiPage() {
           <h2 className="font-serif text-xl font-bold text-lumiere-cream">
             1. Identitas Pemesan & Jadwal Kunjungan
           </h2>
+
+          {isAdmin && (
+            <div>
+              <label className="block text-xs font-medium text-lumiere-muted mb-1.5">
+                Buat reservasi untuk pelanggan *
+              </label>
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => handleCustomerChange(e.target.value)}
+                className="input-dark"
+              >
+                <option value="">— Pilih pelanggan —</option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.full_name} · {customer.email}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-[11px] text-lumiere-muted">
+                Sebagai admin, reservasi dibuat atas nama pelanggan yang dipilih.
+                Data kontak di bawah akan diisi otomatis.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>

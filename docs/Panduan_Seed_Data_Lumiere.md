@@ -69,7 +69,7 @@ Akun dibuat sebagai user Supabase Auth dengan email terkonfirmasi untuk kebutuha
 
 ## Cara menjalankan
 
-1. Pastikan migration 1 sampai 5 sudah dijalankan dan tidak ada error.
+1. Pastikan migration 1 sampai 6 sudah dijalankan dan tidak ada error.
 2. Buka **Supabase Dashboard → SQL Editor**.
 3. Buat query baru, lalu buka dan salin seluruh isi file `docs/seed.sql`.
 4. Jalankan query menggunakan koneksi tepercaya/SQL Editor, bukan dari browser atau client aplikasi.

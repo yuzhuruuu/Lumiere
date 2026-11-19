@@ -42,6 +42,7 @@ const stamp = Date.now().toString(36).toUpperCase()
 const password = 'LumiereTest#2026'
 const emailA = `reservation-test-a-${stamp.toLowerCase()}@lumiere.test`
 const emailB = `reservation-test-b-${stamp.toLowerCase()}@lumiere.test`
+const emailAdmin = `reservation-test-admin-${stamp.toLowerCase()}@lumiere.test`
 
 const admin = createClient(url, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -216,6 +217,20 @@ async function main() {
   const userB = userBResult.data.user
   await waitForProfile(userB.id)
 
+  const userAdminResult = await admin.auth.admin.createUser({
+    email: emailAdmin,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: 'Admin Uji', phone: '081234567803' },
+  })
+  assertNoError(userAdminResult, 'create user admin')
+  await waitForProfile(userAdminResult.data.user.id)
+  const { error: adminRoleError } = await admin
+    .from('profiles')
+    .update({ role: 'admin', is_active: true })
+    .eq('id', userAdminResult.data.user.id)
+  assertNoError({ error: adminRoleError }, 'set admin role')
+
   const clientA = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -223,6 +238,9 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const anonymousClient = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  const clientAdmin = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
@@ -236,6 +254,11 @@ async function main() {
     password,
   })
   assertNoError(loginB, 'login B')
+  const loginAdmin = await clientAdmin.auth.signInWithPassword({
+    email: emailAdmin,
+    password,
+  })
+  assertNoError(loginAdmin, 'login admin')
 
   function createReservation(client, overrides = {}) {
     return client.rpc('create_reservation', {
@@ -249,6 +272,23 @@ async function main() {
       p_table_id: tableA.id,
       p_items: [{ menu_item_id: menuByName['Steak Uji'].id, quantity: 2 }],
       p_notes: null,
+      ...overrides,
+    })
+  }
+
+  function createReservationForCustomer(client, customerId, overrides = {}) {
+    return client.rpc('create_reservation_for_customer', {
+      p_customer_id: customerId,
+      p_contact_name: 'Pelanggan Uji',
+      p_contact_phone: '081234567890',
+      p_contact_email: 'pelanggan.uji@example.com',
+      p_reservation_date: '2099-02-20',
+      p_start_time: '19:00',
+      p_duration_minutes: 120,
+      p_guest_count: 4,
+      p_table_id: tableA.id,
+      p_items: [{ menu_item_id: menuByName['Steak Uji'].id, quantity: 2 }],
+      p_notes: 'Reservasi dibuat admin',
       ...overrides,
     })
   }
@@ -669,6 +709,27 @@ async function main() {
       ['28000', '42501'].includes(result.error?.code),
       `kode error tak terduga: ${result.error?.code}`
     )
+  })
+
+  await test('admin dapat membuat reservasi untuk pelanggan terdaftar', async () => {
+    const result = await createReservationForCustomer(clientAdmin, userA.id)
+
+    assertNoError(result, 'admin create reservation for customer')
+    assert.equal(result.data.customer_id, userA.id)
+    assert.equal(result.data.status, 'menunggu_validasi')
+
+    const itemsResult = await admin
+      .from('reservation_items')
+      .select('menu_item_id, quantity, unit_price')
+      .eq('reservation_id', result.data.id)
+    assertNoError(itemsResult, 'read admin-created reservation items')
+    assert.equal(itemsResult.data.length, 1)
+    assert.equal(itemsResult.data[0].unit_price, 150000)
+  })
+
+  await test('pelanggan tidak bisa memanggil RPC pembuat reservasi admin', async () => {
+    const result = await createReservationForCustomer(clientA, userA.id)
+    assert.equal(result.error?.code, '42501')
   })
 
   console.log('')
