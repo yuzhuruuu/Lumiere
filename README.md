@@ -4,6 +4,22 @@ Sistem informasi restoran dan reservasi — project akhir.
 
 **Produksi:** https://lumiere-barnresto.vercel.app
 
+## Deskripsi Project
+
+Lumière Bar & Resto adalah sistem informasi restoran berbasis web untuk
+mengelola informasi publik, reservasi meja, pemesanan menu, validasi staf,
+check-in dengan barcode, pencatatan pembayaran, serta rekap transaksi. Proyek
+ini dibangun dengan Next.js dan Supabase sebagai satu aplikasi full-stack:
+frontend dan backend berada dalam satu repository, dengan batas tanggung jawab
+yang dijelaskan di `docs/repo-structure.md`.
+
+Sistem mendukung tiga peran: pelanggan mengajukan reservasi dan memantau
+statusnya, staf memvalidasi reservasi serta mengelola kedatangan dan
+pembayaran, sementara administrator mengelola data operasional dan laporan.
+Aturan bisnis utama—kapasitas meja, jam operasional, minimum order Rp300.000,
+pajak 10%, DP 50%, dan pencegahan benturan jadwal—dijaga di server dan database
+agar tetap konsisten meskipun request datang langsung dari client.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router), React 18
@@ -117,6 +133,14 @@ proxy.js          # Refresh sesi & proteksi route
 | `pelanggan` | Buat untuk diri sendiri, lihat/batalkan milik sendiri | – | – | Terbatas |
 | `staf` | Validasi, check-in, reschedule, pindah meja, invoice, pembayaran | – | – | Operasional |
 | `admin` | Semua hak staf + buat reservasi untuk pelanggan | CRUD | Role/status | Penuh |
+
+## Kontributor
+
+| Nama | Peran | GitHub | Fokus |
+|---|---|---|---|
+| Herdi Rizky | Front End | [@IkiBOYY21](https://github.com/IkiBOYY21) — Collaborator | Halaman dan antarmuka pengguna |
+| Annisa Yusri | Back End | – | API, database, RLS, dan integrasi Supabase |
+| Mahendra | Product Manager | [@mahendrarq28](https://github.com/mahendrarq28) — Collaborator | PRD, koordinasi, dan pengawasan deliverable |
 
 ## Deployment & Catatan Produksi
 
