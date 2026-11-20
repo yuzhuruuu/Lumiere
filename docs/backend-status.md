@@ -91,6 +91,18 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 - Pajak **10%** (`restaurant_profile.tax_percentage`) ditambahkan ke subtotal:
   `total_amount = subtotal + tax_amount`. DP default 50% dari total.
 - Pembayaran wajib `idempotency_key` unik; kelebihan bayar ditolak trigger.
+- PRD v0.4: persetujuan reservasi memakai `approve_reservation(...)` — status,
+  invoice, dan batas bayar DP dibuat dalam satu transaksi.
+- DP default 15 menit sejak disetujui (`dp_deadline_minutes`), tidak melewati jam
+  mulai. Hitung mundur berhenti saat bukti dikirim (status `menunggu`).
+- Transfer/QRIS wajib bukti dan diverifikasi staf lewat `verify_payment(...)`;
+  tunai/debit dicatat staf di restoran lewat `record_payment_at_restaurant(...)`.
+- Check-in hanya jika invoice `dp_dibayar`/`lunas`; `selesai` hanya jika `lunas`.
+- Order dapur dibuat saat check-in, bukan saat invoice.
+- Pembatalan pelanggan: kapan saja jika belum ada uang masuk; sampai H-1 jika DP
+  sudah diterima; ditahan saat ada pembayaran menunggu verifikasi.
+- DP dikembalikan lewat pencatatan refund (`settle_refund(...)`) atau hangus
+  jika pelanggan tidak hadir.
 - Role/status akun hanya bisa diubah admin; admin terakhir tidak bisa dinonaktifkan.
 - Sesuai PRD 3.3, admin juga boleh membuat reservasi **atas nama pelanggan
   terdaftar** lewat `customer_id`. Pelanggan tetap membuat reservasi untuk
@@ -129,12 +141,13 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   - benturan jadwal `409`, kapasitas/minimum order `422`, input tidak valid `400`
   - anonim `401` dan detail milik pelanggan lain `404`
   - admin membuat reservasi untuk pelanggan lewat API (`customer_id`)
-- Integration test alur staf: **18/18 lulus**
+- Integration test alur staf: **17/17 lulus**
   (`npm run test:integration:staff`)
   - pencarian kode barcode, validasi setuju/tolak dengan alasan
-  - invoice otomatis 10% pajak, DP 50%, pelunasan sampai lunas
-  - satu order per reservasi + transisi status pesanan dapur
-  - check-in, penolakan check-in berulang, dan penyelesaian reservasi
+  - `approve_reservation`: invoice + pajak 10% + DP 50% + `dp_due_at` satu transaksi
+  - DP dan pelunasan tercatat lewat RPC; invoice menjadi lunas
+  - belum ada order sebelum check-in; order dibuat saat check-in lalu status dapur diubah
+  - penolakan check-in berulang dan penyelesaian reservasi setelah lunas
   - pelanggan ditolak dari API staf/admin; staf ditolak dari API admin;
     admin dapat membaca rekap transaksi dan pengguna
 
@@ -155,7 +168,8 @@ tersentuh.
 
 1. **Commit & push** semua perubahan ke branch fitur, lalu PR.
 2. **Deploy** ke Vercel dan uji di produksi.
-3. Pastikan migration 1–5 sudah dijalankan di Supabase:
+3. Pastikan **semua** migration sudah dijalankan di Supabase (1–4,
+   `20261118000001`, `20261119000001`, `20261119000005`, `20261119000006`):
    - `SELECT * FROM cron.job;` → ada `expire-pending-reservations`
    - bucket `restaurant-assets` ada
 4. Ubah `pending_timeout_minutes` dari `0` (nilai seed demo) menjadi `30`

@@ -155,43 +155,23 @@ export default function StaffReservationDetailPage() {
     loadData();
   }, [params.id]);
 
-  // Approve reservation & auto-generate invoice + order (FR-15 & FR-21)
+  // PRD v0.4: approve_reservation membuat status, invoice, dan batas DP
+  // dalam satu transaksi. Order dapur dibuat saat check-in.
   const handleApprove = async () => {
     if (!reservation) return;
     setBusy(true);
     setFeedback(null);
 
-    const { error: updErr } = await supabase
-      .from("reservations")
-      .update({
-        status: "dikonfirmasi",
-        validated_by: staffId,
-        validated_at: new Date().toISOString(),
-      })
-      .eq("id", reservation.id);
-
-    if (updErr) {
-      setFeedback({ type: "error", text: translateDbError(updErr) });
-      setBusy(false);
-      return;
-    }
-
-    // Generate invoice & kitchen order atomically via RPC
-    const { error: invErr } = await supabase.rpc("generate_invoice", {
+    const { error } = await supabase.rpc("approve_reservation", {
       p_reservation_id: reservation.id,
     });
 
-    if (invErr) {
-      setFeedback({
-        type: "error",
-        text: `Reservasi dikonfirmasi, tetapi gagal membuat tagihan: ${translateDbError(
-          invErr
-        )}`,
-      });
+    if (error) {
+      setFeedback({ type: "error", text: translateDbError(error) });
     } else {
       setFeedback({
         type: "success",
-        text: "Reservasi disetujui, tagihan & pesanan dapur berhasil dibuat!",
+        text: "Reservasi disetujui. Tagihan dan batas bayar DP sudah dibuat!",
       });
     }
 
@@ -334,16 +314,19 @@ export default function StaffReservationDetailPage() {
         ? crypto.randomUUID()
         : `pay-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-    const { error } = await supabase.from("payments").insert({
-      invoice_id: invoice.id,
-      type: parsed.data.type,
-      method: parsed.data.method,
-      amount: parsed.data.amount,
-      status: "berhasil",
-      reference_no: parsed.data.referenceNo || null,
-      idempotency_key: idempotencyKey,
-      paid_at: new Date().toISOString(),
-      recorded_by: staffId,
+    const choiceByType: Record<string, string> = {
+      dp: "dp_50",
+      penuh: "penuh",
+      pelunasan: "pelunasan",
+    };
+
+    // Nominal dihitung database oleh record_payment_at_restaurant.
+    const { error } = await supabase.rpc("record_payment_at_restaurant", {
+      p_invoice_id: invoice.id,
+      p_choice: choiceByType[parsed.data.type],
+      p_method: parsed.data.method,
+      p_idempotency_key: idempotencyKey,
+      p_reference: parsed.data.referenceNo || null,
     });
 
     if (error) {
@@ -352,9 +335,7 @@ export default function StaffReservationDetailPage() {
       setPayRef("");
       setFeedback({
         type: "success",
-        text: `Pembayaran ${parsed.data.type.toUpperCase()} sebesar ${formatIDR(
-          parsed.data.amount
-        )} berhasil dicatat!`,
+        text: `Pembayaran ${parsed.data.type.toUpperCase()} berhasil dicatat. Nominal dihitung sistem.`,
       });
       await loadData();
     }

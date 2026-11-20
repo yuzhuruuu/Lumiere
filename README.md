@@ -39,6 +39,8 @@ agar tetap konsisten meskipun request datang langsung dari client.
   selain CRUD menu/kategori/meja/jam/profil/users dan rekap transaksi.
 - Staf: validasi/penolakan reservasi, reschedule, pindah meja, invoice,
   pencatatan DP/pelunasan, check-in barcode, status pesanan, dan penyelesaian.
+- Pembayaran PRD v0.4: pilihan DP 50%/penuh, batas bayar 15 menit, bukti
+  transfer/QRIS, verifikasi staf, refund, dan DP hangus.
 - Database: transaksi atomik, pajak 10%, DP 50%, minimum order Rp300.000,
   pencegahan benturan meja, riwayat status, dan RLS per peran.
 
@@ -146,7 +148,10 @@ proxy.js          # Refresh sesi & proteksi route
 
 - Vercel deploy otomatis dari `main`.
 - Setiap migration baru harus tetap dijalankan di Supabase production melalui
-  SQL Editor bila Supabase GitHub integration tidak menjalankannya.
+  SQL Editor bila Supabase GitHub integration tidak menjalankannya. Migration
+  terbaru: `20261119000005_payment_workflow.sql` dan
+  `20261119000006_dp_deadline_and_payment_guards.sql`. Ganti juga rekening/QRIS
+  dummy dari seed sebelum demo.
 - Untuk mengaktifkan auto-cancel 30 menit:
 
 ```sql

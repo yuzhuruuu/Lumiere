@@ -66,7 +66,7 @@ export async function PATCH(request, { params }) {
       console.error('Cancel reservation error:', error)
       if (error.code === '23514') {
         return NextResponse.json(
-          { error: 'Status reservasi sudah berubah. Muat ulang halaman.' },
+          { error: error.message || 'Pembatalan tidak diizinkan.' },
           { status: 409 }
         )
       }
