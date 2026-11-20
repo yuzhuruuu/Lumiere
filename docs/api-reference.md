@@ -207,7 +207,7 @@ Body pembatalan (opsional):
 | Method | Path | Keterangan |
 |---|---|---|
 | GET | `/api/staff/reservations` | Semua reservasi; filter `status`, `date`, `search`, `limit`, `offset` |
-| PATCH | `/api/staff/reservations/[id]/validate` | Setujui / tolak reservasi |
+| PATCH | `/api/staff/reservations/[id]/validate` | Setujui/tolak; approve memakai `approve_reservation` (invoice + batas DP sekaligus) |
 | PATCH | `/api/staff/reservations/[id]/reschedule` | Ubah tanggal/jam/durasi/tamu/meja sebelum check-in |
 | PATCH | `/api/staff/reservations/[id]/check-in` | Check-in tamu / tandai tidak hadir |
 | PATCH | `/api/staff/reservations/[id]/complete` | Selesaikan reservasi (`check_in → selesai`) |
@@ -230,6 +230,11 @@ Body pembatalan (opsional):
 ```json
 { "action": "reject", "rejection_reason": "Meja penuh pada jam tersebut" }
 ```
+
+Aksi `approve` memanggil `approve_reservation(...)`: status berubah, invoice
+diterbitkan, dan `dp_due_at` dipasang dalam satu transaksi. Response memuat
+`invoice`. Endpoint lama `POST /api/staff/reservations/[id]/invoice` tetap ada
+untuk data lama, tetapi tidak diperlukan pada alur baru.
 
 ### Ubah jadwal (reschedule)
 
@@ -282,7 +287,27 @@ Aturan pembatalan tagihan:
 - Reservasi harus sudah `dibatalkan` atau `tidak_hadir`.
 - Tagihan `dp_dibayar`/`lunas` tidak bisa dibatalkan lewat API (refund manual).
 
-### Catat pembayaran
+### Alur pembayaran PRD v0.4
+
+| Method | Path | Keterangan |
+|---|---|---|
+| POST | `/api/payments/submit` | Pelanggan mengajukan DP/penuh/pelunasan transfer/QRIS + bukti (multipart) |
+| PATCH | `/api/staff/payments/[id]/verify` | Staf menerima/menolak bukti (`terima`/`tolak` + alasan) |
+| POST | `/api/staff/payments` | Staf mencatat tunai/debit/pelunasan di restoran (nominal dihitung DB) |
+| GET | `/api/staff/refunds` | Antrean refund DP |
+| POST | `/api/staff/refunds/[invoiceId]/settle` | Selesaikan refund atau tandai DP hangus |
+
+`POST /api/payments/submit` menerima `invoice_id`, `choice` (`dp_50`/`penuh`/
+`pelunasan`), `method` (`transfer`/`qris`), `idempotency_key`, dan file `proof`.
+Nominal selalu dihitung database. Bukti diunggah ke bucket private
+`payment-proofs/{user_id}/...` sebelum RPC dipanggil.
+
+`POST /api/staff/payments` masih menerima payload lama (`type: dp|penuh|pelunasan`,
+`method`, `idempotency_key`, opsional `amount`/`status`), tetapi `amount` dan
+`status` diabaikan — nominal dan status ditentukan RPC
+`record_payment_at_restaurant(...)`.
+
+### Catat pembayaran (legacy/compability)
 
 `POST /api/staff/payments`
 

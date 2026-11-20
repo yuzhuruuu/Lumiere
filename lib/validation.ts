@@ -41,7 +41,7 @@ export const reservationStep1Schema = z.object({
 });
 
 export const paymentSchema = z.object({
-  type: z.enum(["dp", "pelunasan"]),
+  type: z.enum(["dp", "penuh", "pelunasan"]),
   method: z.enum(["tunai", "transfer", "qris", "kartu_debit"]),
   amount: z.number().positive("Nominal pembayaran harus lebih dari Rp0"),
   referenceNo: z.string().trim().max(100).optional(),

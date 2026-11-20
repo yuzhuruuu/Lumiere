@@ -52,33 +52,37 @@ export async function PATCH(request, { params }) {
       )
     }
 
-    const updateData =
-      parsed.data.action === 'approve'
-        ? {
-            status: 'dikonfirmasi',
-            validated_by: auth.profile.id,
-            validated_at: new Date().toISOString(),
-            rejection_reason: null,
-          }
-        : {
-            status: 'ditolak',
-            validated_by: auth.profile.id,
-            validated_at: new Date().toISOString(),
-            rejection_reason: parsed.data.rejection_reason,
-          }
+    let data = null
+    let error = null
 
-    const { data, error } = await supabase
-      .from('reservations')
-      .update(updateData)
-      .eq('id', id)
-      .select('id, reservation_code, status, validated_at, rejection_reason')
-      .single()
+    if (parsed.data.action === 'approve') {
+      // PRD v0.4: setuju + terbitkan invoice + pasang batas DP dalam satu transaksi.
+      const rpc = await supabase.rpc('approve_reservation', {
+        p_reservation_id: id,
+      })
+      data = rpc.data
+      error = rpc.error
+    } else {
+      const result = await supabase
+        .from('reservations')
+        .update({
+          status: 'ditolak',
+          validated_by: auth.profile.id,
+          validated_at: new Date().toISOString(),
+          rejection_reason: parsed.data.rejection_reason,
+        })
+        .eq('id', id)
+        .select('id, reservation_code, status, validated_at, rejection_reason')
+        .single()
+      data = result.data
+      error = result.error
+    }
 
     if (error) {
       console.error('Validate reservation error:', error)
       if (error.code === '23514') {
         return NextResponse.json(
-          { error: 'Status reservasi sudah berubah. Muat ulang halaman.' },
+          { error: error.message || 'Status reservasi sudah berubah. Muat ulang halaman.' },
           { status: 409 }
         )
       }
@@ -88,18 +92,31 @@ export async function PATCH(request, { params }) {
           { status: 403 }
         )
       }
+      if (error.code === 'P0002') {
+        return NextResponse.json(
+          { error: 'Reservasi tidak ditemukan' },
+          { status: 404 }
+        )
+      }
       return NextResponse.json(
         { error: 'Gagal memvalidasi reservasi' },
         { status: 500 }
       )
     }
 
+    const { data: reservation } = await supabase
+      .from('reservations')
+      .select('id, reservation_code, status, validated_at, rejection_reason')
+      .eq('id', id)
+      .single()
+
     return NextResponse.json({
       message:
         parsed.data.action === 'approve'
           ? 'Reservasi berhasil dikonfirmasi'
           : 'Reservasi berhasil ditolak',
-      reservation: data,
+      reservation,
+      invoice: parsed.data.action === 'approve' ? data : null,
     })
   } catch (error) {
     console.error('Unexpected error:', error)

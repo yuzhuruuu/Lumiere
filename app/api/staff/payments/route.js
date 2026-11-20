@@ -146,65 +146,32 @@ export async function POST(request) {
 
     const d = parsed.data
 
-    // Pastikan invoice ada dan belum dibatalkan. Pemeriksaan ini juga memberi
-    // pesan yang jelas sebelum trigger database menolak pembayaran.
-    const { data: invoiceCheck, error: invoiceCheckError } = await supabase
-      .from('invoices')
-      .select('id, payment_status, total_amount, dp_amount')
-      .eq('id', d.invoice_id)
-      .single()
-
-    if (invoiceCheckError || !invoiceCheck) {
-      return NextResponse.json(
-        { error: 'Invoice tidak ditemukan' },
-        { status: 404 }
-      )
+    // PRD v0.4: nominal dihitung database, bukan dari client.
+    const choiceByLegacyType = {
+      dp: 'dp_50',
+      penuh: 'penuh',
+      pelunasan: 'pelunasan',
     }
+    const pChoice = d.payment_choice || choiceByLegacyType[d.type] || 'dp_50'
 
-    if (invoiceCheck.payment_status === 'dibatalkan') {
-      return NextResponse.json(
-        { error: 'Invoice sudah dibatalkan dan tidak bisa menerima pembayaran' },
-        { status: 409 }
-      )
-    }
-
-    const { data, error } = await supabase
-      .from('payments')
-      .insert({
-        invoice_id: d.invoice_id,
-        type: d.type,
-        method: d.method,
-        amount: d.amount,
-        status: d.status,
-        reference_no: d.reference_no || null,
-        idempotency_key: d.idempotency_key,
-        paid_at: new Date().toISOString(),
-        recorded_by: auth.profile.id,
-      })
-      .select(
-        'id, invoice_id, type, method, amount, status, reference_no, paid_at'
-      )
-      .single()
+    const { data: paymentId, error } = await supabase.rpc(
+      'record_payment_at_restaurant',
+      {
+        p_invoice_id: d.invoice_id,
+        p_choice: pChoice,
+        p_method: d.method,
+        p_idempotency_key: d.idempotency_key,
+        p_reference: d.reference_no || null,
+      }
+    )
 
     if (error) {
-      console.error('Create payment error:', error)
+      console.error('Record payment error:', error)
 
-      if (error.code === '23505') {
+      if (error.code === '23505' || error.message?.includes('idempotency')) {
         return NextResponse.json(
           { error: 'Pembayaran ini sudah pernah dicatat (idempotency key ganda)' },
           { status: 409 }
-        )
-      }
-      if (error.code === '23503') {
-        return NextResponse.json(
-          { error: 'Invoice tidak ditemukan' },
-          { status: 404 }
-        )
-      }
-      if (error.code === '23514') {
-        return NextResponse.json(
-          { error: 'Jumlah pembayaran melebihi sisa tagihan atau tidak valid' },
-          { status: 422 }
         )
       }
       if (error.code === '42501') {
@@ -213,31 +180,39 @@ export async function POST(request) {
           { status: 403 }
         )
       }
+      if (error.code === '23514' || error.code === 'P0002') {
+        return NextResponse.json(
+          { error: error.message || 'Pembayaran tidak valid' },
+          { status: 422 }
+        )
+      }
       return NextResponse.json(
         { error: 'Gagal mencatat pembayaran' },
         { status: 500 }
       )
     }
 
-    // Ambil status invoice terbaru setelah trigger berjalan
-    const { data: invoice } = await supabase
-      .from('invoices')
-      .select('id, invoice_number, payment_status, total_amount')
-      .eq('id', d.invoice_id)
-      .single()
+    const [{ data: payment }, { data: invoice }] = await Promise.all([
+      supabase
+        .from('payments')
+        .select(
+          'id, invoice_id, type, payment_choice, method, amount, status, reference_no, paid_at, verified_at'
+        )
+        .eq('id', paymentId)
+        .single(),
+      supabase
+        .from('invoices')
+        .select('id, invoice_number, payment_status, total_amount')
+        .eq('id', d.invoice_id)
+        .single(),
+    ])
 
     return NextResponse.json(
       {
         message: 'Pembayaran berhasil dicatat',
-        payment: {
-          ...data,
-          amount: parseFloat(data.amount),
-        },
+        payment: payment ? { ...payment, amount: parseFloat(payment.amount) } : null,
         invoice: invoice
-          ? {
-              ...invoice,
-              total_amount: parseFloat(invoice.total_amount),
-            }
+          ? { ...invoice, total_amount: parseFloat(invoice.total_amount) }
           : null,
       },
       { status: 201 }

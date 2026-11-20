@@ -9,6 +9,8 @@ File migration, dijalankan berurutan:
 4. `supabase/migrations/20261031000004_auto_cancel_cron.sql`: jadwal `pg_cron` yang membatalkan reservasi tak divalidasi.
 5. `supabase/migrations/20261118000001_reservation_same_day_time_guard.sql`: validasi database untuk reservasi hari ini yang jamnya sudah lewat dan reschedule ke jam lewat.
 6. `supabase/migrations/20261119000001_admin_create_reservation_for_customer.sql`: RPC `create_reservation_for_customer(...)` agar admin membuat reservasi atas nama pelanggan terdaftar.
+7. `supabase/migrations/20261119000005_payment_workflow.sql`: konfigurasi rekening/QRIS, pilihan pembayaran, bukti, bucket `payment-proofs`, dan RPC pengajuan pembayaran.
+8. `supabase/migrations/20261119000006_dp_deadline_and_payment_guards.sql`: batas bayar DP, pagar check-in/selesai, pembatalan H-1, DP hangus, refund, dan RPC verifikasi pembayaran.
 
 Data contoh ada di `supabase/seed.sql` (terpisah dari migration, dijalankan terakhir).
 
