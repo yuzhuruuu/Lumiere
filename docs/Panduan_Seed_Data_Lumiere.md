@@ -69,7 +69,8 @@ Akun dibuat sebagai user Supabase Auth dengan email terkonfirmasi untuk kebutuha
 
 ## Cara menjalankan
 
-1. Pastikan migration 1 sampai 6 sudah dijalankan dan tidak ada error.
+1. Pastikan **semua** migration sudah dijalankan dan tidak ada error (1–4,
+   `20261118000001`, `20261119000001`, `20261119000005`, `20261119000006`).
 2. Buka **Supabase Dashboard → SQL Editor**.
 3. Buat query baru, lalu buka dan salin seluruh isi file `docs/seed.sql`.
 4. Jalankan query menggunakan koneksi tepercaya/SQL Editor, bukan dari browser atau client aplikasi.
@@ -85,5 +86,7 @@ Akun dibuat sebagai user Supabase Auth dengan email terkonfirmasi untuk kebutuha
 - Karena seed membuat akun langsung melalui `auth.users`, jalankan sebagai admin/SQL Editor. Jangan menjalankan file ini dari endpoint publik aplikasi.
 - `reservation_status_logs` dihasilkan oleh trigger sehingga tidak diinsert manual.
 - Tanggal reservasi contoh mulai **besok** agar seed tetap bisa dijalankan kapan pun. Trigger database menolak reservasi hari ini yang jamnya sudah lewat.
+- Seed revisi memuat konfigurasi rekening/QRIS dummy, pilihan DP/penuh/pelunasan, bukti, verifikasi, refund, dan DP hangus. Setelah seed dijalankan, jalankan `SELECT public.backfill_money_flags();`.
+- Nomor rekening `0000000000` dan `qris_path = NULL` adalah dummy. Ganti dengan data resmi sebelum demo.
 - `reservation_items.unit_price` diisi otomatis oleh trigger dari harga menu yang tersimpan, sehingga snapshot harga konsisten dengan database.
 - Pada aplikasi yang berjalan, pembuatan reservasi tetap harus menggunakan RPC `create_reservation(...)` agar pemeriksaan minimum pembelian terjadi dalam satu transaksi. Pembuatan invoice tetap menggunakan `generate_invoice(...)` sesuai hak akses staf/admin.

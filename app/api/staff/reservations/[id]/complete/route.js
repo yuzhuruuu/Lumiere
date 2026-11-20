@@ -47,7 +47,7 @@ export async function PATCH(request, { params }) {
       console.error('Complete reservation error:', error)
       if (error.code === '23514') {
         return NextResponse.json(
-          { error: 'Status reservasi sudah berubah. Muat ulang halaman.' },
+          { error: error.message || 'Status reservasi sudah berubah.' },
           { status: 409 }
         )
       }

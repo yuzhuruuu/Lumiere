@@ -6,7 +6,8 @@ supaya tidak pernah membuat data uji di production.
 
 ## Prasyarat
 
-1. Supabase lokal berjalan dan migration 1–6 sudah diterapkan.
+1. Supabase lokal berjalan dan semua migration sudah diterapkan (1–4,
+   `20261118000001`, `20261119000001`, `20261119000005`, `20261119000006`).
 2. Untuk `api-reservations.mjs` dan `staff-reservations.mjs`, jalankan Next.js
    dengan environment Supabase lokal, misalnya:
 

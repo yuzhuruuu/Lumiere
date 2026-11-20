@@ -321,7 +321,7 @@ async function main() {
     assert.ok(users.body.total >= 1)
   })
 
-  await test('staf menyetujui reservasi', async () => {
+  await test('staf menyetujui reservasi dan invoice langsung terbentuk', async () => {
     const response = await request(
       `/api/staff/reservations/${reservation.id}/validate`,
       {
@@ -333,59 +333,26 @@ async function main() {
 
     assert.equal(response.status, 200)
     assert.equal(response.body.reservation.status, 'dikonfirmasi')
-  })
 
-  await test('staf membuat invoice dan total memakai pajak 10%', async () => {
-    const response = await request(
-      `/api/staff/reservations/${reservation.id}/invoice`,
-      { method: 'POST', cookie: staffCookie }
-    )
-
-    assert.equal(response.status, 201)
     invoice = response.body.invoice
+    assert.ok(invoice, 'invoice harus dibuat dalam satu langkah persetujuan')
     assert.match(invoice.invoice_number, /^INV-\d{6}-\d{5}$/)
     assert.equal(invoice.subtotal, 300000)
     assert.equal(invoice.tax_amount, 30000)
     assert.equal(invoice.total_amount, 330000)
     assert.equal(invoice.dp_amount, 165000)
     assert.equal(invoice.payment_status, 'belum_dibayar')
+    assert.ok(invoice.dp_due_at, 'batas bayar DP harus terpasang')
   })
 
-  await test('invoice membuat satu order dengan snapshot harga', async () => {
+  await test('belum ada order dapur sebelum check-in', async () => {
     const { data: orders, error } = await admin
       .from('orders')
-      .select('id, status')
+      .select('id')
       .eq('reservation_id', reservation.id)
 
     assertNoError({ error }, 'read orders')
-    assert.equal(orders.length, 1)
-    assert.equal(orders[0].status, 'menunggu')
-  })
-
-  await test('staf memperbarui status pesanan sesuai alur dapur', async () => {
-    const { data: order, error } = await admin
-      .from('orders')
-      .select('id, status')
-      .eq('reservation_id', reservation.id)
-      .single()
-    assertNoError({ error }, 'read order for status test')
-
-    for (const status of ['disiapkan', 'disajikan', 'selesai']) {
-      const response = await request(`/api/staff/orders/${order.id}`, {
-        method: 'PATCH',
-        cookie: staffCookie,
-        body: { status },
-      })
-      assert.equal(response.status, 200)
-      assert.equal(response.body.order.status, status)
-    }
-
-    const invalid = await request(`/api/staff/orders/${order.id}`, {
-      method: 'PATCH',
-      cookie: staffCookie,
-      body: { status: 'disiapkan' },
-    })
-    assert.equal(invalid.status, 409)
+    assert.equal(orders.length, 0)
   })
 
   await test('detail pelanggan memakai angka invoice, bukan estimasi', async () => {
@@ -453,6 +420,35 @@ async function main() {
 
     assert.equal(response.status, 200)
     assert.equal(response.body.reservation.status, 'check_in')
+  })
+
+  await test('check-in membuat order dapur dan status dapat diperbarui', async () => {
+    const { data: orders, error } = await admin
+      .from('orders')
+      .select('id, status')
+      .eq('reservation_id', reservation.id)
+
+    assertNoError({ error }, 'read orders after check-in')
+    assert.equal(orders.length, 1)
+    assert.equal(orders[0].status, 'menunggu')
+
+    const orderId = orders[0].id
+    for (const status of ['disiapkan', 'disajikan', 'selesai']) {
+      const response = await request(`/api/staff/orders/${orderId}`, {
+        method: 'PATCH',
+        cookie: staffCookie,
+        body: { status },
+      })
+      assert.equal(response.status, 200)
+      assert.equal(response.body.order.status, status)
+    }
+
+    const invalid = await request(`/api/staff/orders/${orderId}`, {
+      method: 'PATCH',
+      cookie: staffCookie,
+      body: { status: 'disiapkan' },
+    })
+    assert.equal(invalid.status, 409)
   })
 
   await test('check-in berulang ditolak', async () => {

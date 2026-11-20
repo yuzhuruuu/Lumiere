@@ -7,6 +7,9 @@
 -- 2) rls_policies
 -- 3) storage
 -- 4) auto_cancel_cron
+-- 5) payment_workflow (migration tambahan)
+-- 6) dp_deadline_and_payment_guards (batas bayar DP, pagar check-in/selesai, refund)
+-- (jalankan semua file migration berurutan menurut nama/timestamp-nya, termasuk 20261118 dan 20261119000001)
 --
 -- Jalankan melalui Supabase SQL Editor atau koneksi database tepercaya
 -- (postgres/service role), BUKAN melalui browser/client aplikasi.
@@ -20,7 +23,10 @@
 -- - 20+ data disediakan untuk tabel multi-record utama.
 -- - reservation_status_logs dibuat otomatis oleh trigger.
 -- - reservation_items.unit_price diisi trigger dari harga menu.
--- - invoice/order/payment dibuat langsung sebagai fixture demo; aplikasi
+-- - invoice/order/payment dibuat langsung sebagai fixture demo; payment-choice, selected_by,
+--   verified_at, proof_path, dan payment settings mengikuti migration tambahan.
+-- - nomor rekening dan nama pemilik adalah dummy; QRIS belum diunggah (qris_path NULL).
+--   Aplikasi
 --   tetap harus memakai RPC dan aturan akses yang sudah dirancang.
 -- =====================================================================
 
@@ -143,7 +149,8 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO public.restaurant_profile (
     id, name, tagline, description, address, phone, email,
     min_order_amount, dp_percentage, tax_percentage,
-    pending_timeout_minutes, updated_at
+    pending_timeout_minutes, bank_name, bank_account_number, bank_account_name,
+    qris_path, available_payment_methods, payment_instructions, updated_at
 )
 VALUES (
     1,
@@ -157,6 +164,12 @@ VALUES (
     50,
     10,
     0,
+    'BCA',
+    '0000000000',
+    'Lumière Bar & Resto (DUMMY)',
+    NULL,
+    ARRAY['tunai','transfer','qris','kartu_debit']::text[],
+    'Informasi pembayaran ini hanya data dummy untuk pengujian. Ganti dengan rekening dan QRIS resmi sebelum demo.',
     now()
 )
 ON CONFLICT (id) DO UPDATE SET
@@ -170,6 +183,12 @@ ON CONFLICT (id) DO UPDATE SET
     dp_percentage = EXCLUDED.dp_percentage,
     tax_percentage = EXCLUDED.tax_percentage,
     pending_timeout_minutes = EXCLUDED.pending_timeout_minutes,
+    bank_name = EXCLUDED.bank_name,
+    bank_account_number = EXCLUDED.bank_account_number,
+    bank_account_name = EXCLUDED.bank_account_name,
+    qris_path = EXCLUDED.qris_path,
+    available_payment_methods = EXCLUDED.available_payment_methods,
+    payment_instructions = EXCLUDED.payment_instructions,
     updated_at = now();
 
 -- ---------------------------------------------------------------------
@@ -321,7 +340,9 @@ SELECT
         WHEN (((n - 1) % 20) + 1) BETWEEN 14 AND 17 THEN 6
         ELSE 8
     END,
-    (now() AT TIME ZONE 'Asia/Jakarta')::date + ((n - 1) / 20),
+    -- Mulai BESOK: trigger aturan reservasi menolak jam hari ini yang sudah lewat, sehingga
+    -- fixture 'hari ini' gagal jika seed dijalankan setelah pukul 10.00 WIB.
+    (now() AT TIME ZONE 'Asia/Jakarta')::date + 1 + ((n - 1) / 20),
     TIME '10:00' + (((n - 1) % 3) * INTERVAL '4 hours')
 FROM generate_series(1,28) AS gs(n);
 
@@ -513,7 +534,7 @@ INSERT INTO public.payments (
 )
 SELECT
     i.id,
-    'dp'::public.payment_type,
+    'dp'::text,
     'transfer'::public.payment_method,
     round(i.dp_amount * 0.25, 2),
     'berhasil'::public.payment_record_status,
@@ -532,14 +553,14 @@ INSERT INTO public.payments (
 )
 SELECT
     i.id,
-    'dp'::public.payment_type,
+    'dp'::text,
     'qris'::public.payment_method,
-    round(i.dp_amount * 0.50, 2),
+    i.dp_amount,
     'menunggu'::public.payment_record_status,
     'DEMO-PENDING-' || i.invoice_number,
     'seed-lumiere-pending-' || i.invoice_number,
-    now() - interval '1 hour',
-    '10000000-0000-4000-8000-000000000902'::uuid
+    NULL,
+    NULL
 FROM public.invoices i
 JOIN _seed_reservations sr ON sr.id = i.reservation_id
 WHERE sr.reservation_no = 14;
@@ -551,26 +572,26 @@ INSERT INTO public.payments (
 )
 SELECT
     i.id,
-    'dp'::public.payment_type,
+    'dp'::text,
     'transfer'::public.payment_method,
     i.dp_amount,
     'gagal'::public.payment_record_status,
     'DEMO-FAILED-' || i.invoice_number,
     'seed-lumiere-failed-' || i.invoice_number,
-    now() - interval '50 minutes',
-    '10000000-0000-4000-8000-000000000902'::uuid
+    NULL,
+    NULL
 FROM public.invoices i
 JOIN _seed_reservations sr ON sr.id = i.reservation_id
 WHERE sr.reservation_no = 15;
 
--- Pembayaran DP penuh untuk nomor reservasi 17–28.
+-- DP terverifikasi untuk nomor reservasi 17–18 dan 22–28.
 INSERT INTO public.payments (
     invoice_id, type, method, amount, status, reference_no,
     idempotency_key, paid_at, recorded_by
 )
 SELECT
     i.id,
-    'dp'::public.payment_type,
+    'dp'::text,
     CASE (sr.reservation_no % 4)
         WHEN 0 THEN 'tunai'::public.payment_method
         WHEN 1 THEN 'transfer'::public.payment_method
@@ -587,7 +608,32 @@ SELECT
          ELSE '10000000-0000-4000-8000-000000000901'::uuid END
 FROM public.invoices i
 JOIN _seed_reservations sr ON sr.id = i.reservation_id
-WHERE sr.reservation_no BETWEEN 17 AND 28;
+WHERE sr.reservation_no BETWEEN 17 AND 18 OR sr.reservation_no BETWEEN 22 AND 28;
+
+-- Pembayaran penuh (100%) untuk tiga fixture: reservasi 19–21.
+INSERT INTO public.payments (
+    invoice_id, type, method, amount, status, reference_no,
+    idempotency_key, paid_at, recorded_by
+)
+SELECT
+    i.id,
+    'penuh'::text,
+    CASE (sr.reservation_no % 4)
+        WHEN 0 THEN 'tunai'::public.payment_method
+        WHEN 1 THEN 'transfer'::public.payment_method
+        WHEN 2 THEN 'qris'::public.payment_method
+        ELSE 'kartu_debit'::public.payment_method
+    END,
+    i.total_amount,
+    'berhasil'::public.payment_record_status,
+    'DEMO-FULL-' || i.invoice_number,
+    'seed-lumiere-full-' || i.invoice_number,
+    now() - interval '2 hours',
+    '10000000-0000-4000-8000-000000000901'::uuid
+FROM public.invoices i
+JOIN _seed_reservations sr ON sr.id = i.reservation_id
+WHERE sr.reservation_no BETWEEN 19 AND 21;
+
 
 -- Pelunasan hanya untuk reservasi selesai (nomor 22–28).
 INSERT INTO public.payments (
@@ -596,7 +642,7 @@ INSERT INTO public.payments (
 )
 SELECT
     i.id,
-    'pelunasan'::public.payment_type,
+    'pelunasan'::text,
     CASE (sr.reservation_no % 4)
         WHEN 0 THEN 'tunai'::public.payment_method
         WHEN 1 THEN 'transfer'::public.payment_method
@@ -615,6 +661,23 @@ FROM public.invoices i
 JOIN _seed_reservations sr ON sr.id = i.reservation_id
 WHERE sr.reservation_no BETWEEN 22 AND 28;
 
+-- Isi metadata pembayaran: pelanggan pengaju, pilihan, dan verifikasi.
+-- Fixture berhasil diasumsikan sudah diverifikasi; menunggu/gagal tidak dianggap dibayar.
+UPDATE public.payments p
+SET payment_choice = CASE
+        WHEN p.type = 'penuh' THEN 'penuh'
+        WHEN p.type = 'pelunasan' THEN 'pelunasan'
+        ELSE 'dp_50'
+    END,
+    selected_by = r.customer_id,
+    verified_at = CASE WHEN p.status = 'berhasil' THEN p.paid_at ELSE NULL END,
+    paid_at = CASE WHEN p.status = 'berhasil' THEN COALESCE(p.paid_at, now()) ELSE NULL END,
+    recorded_by = CASE WHEN p.status = 'berhasil' THEN p.recorded_by ELSE NULL END
+FROM public.invoices i
+JOIN public.reservations r ON r.id = i.reservation_id
+WHERE p.invoice_id = i.id
+  AND i.reservation_id IN (SELECT id FROM _seed_reservations);
+
 -- Satu menu dibuat tidak tersedia sebagai contoh pengujian katalog.
 -- Item tersebut tetap dapat muncul pada riwayat reservasi lama karena
 -- reservation_items menyimpan snapshot harga saat transaksi dibuat.
@@ -622,10 +685,56 @@ UPDATE public.menu_items
 SET is_available = false
 WHERE id = 9132;
 
+-- Contoh kebijakan DP: #10 dibatalkan pelanggan setelah DP (refund menunggu proses staf),
+-- #11 tidak hadir setelah DP (DP hangus). Invoice keduanya dibuka lagi dari status dibatalkan.
+UPDATE public.invoices
+SET payment_status = 'belum_dibayar'
+WHERE reservation_id IN (SELECT id FROM _seed_reservations WHERE reservation_no IN (10, 11));
+
+INSERT INTO public.payments (
+    invoice_id, type, payment_choice, method, amount, status, reference_no,
+    idempotency_key, selected_by, submitted_at, paid_at, verified_at, verified_by, recorded_by
+)
+SELECT
+    i.id, 'dp', 'dp_50', 'transfer'::public.payment_method, i.dp_amount,
+    'berhasil'::public.payment_record_status,
+    'DEMO-DP-KEBIJAKAN-' || i.invoice_number,
+    'seed-lumiere-dp-kebijakan-' || i.invoice_number,
+    r.customer_id,
+    now() - interval '1 day', now() - interval '1 day', now() - interval '1 day',
+    '10000000-0000-4000-8000-000000000901'::uuid,
+    '10000000-0000-4000-8000-000000000901'::uuid
+FROM public.invoices i
+JOIN public.reservations r ON r.id = i.reservation_id
+JOIN _seed_reservations sr ON sr.id = i.reservation_id
+WHERE sr.reservation_no IN (10, 11);
+
+-- Tandai DP hangus (tidak hadir) dan refund menunggu (dibatalkan) dari fixture pembayaran.
+SELECT public.backfill_money_flags();
+
 -- Identitas transaksi dikosongkan kembali; konteks ini hanya untuk seed.
 SELECT set_config('request.jwt.claim.sub', '', true);
 
 COMMIT;
+
+--
+-- Cek pilihan/metode/status pembayaran:
+-- SELECT payment_choice, method, status, count(*)
+-- FROM public.payments GROUP BY payment_choice, method, status
+-- ORDER BY payment_choice, method, status;
+--
+-- Cek data konfigurasi pembayaran (pastikan dummy diganti sebelum demo):
+-- SELECT bank_name, bank_account_number, bank_account_name,
+--        available_payment_methods, qris_path
+-- FROM public.restaurant_profile WHERE id = 1;
+--
+-- Cek pembayaran berhasil per invoice dan sisa:
+-- SELECT i.invoice_number, i.total_amount,
+--        COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'berhasil'),0) AS paid,
+--        i.total_amount - COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'berhasil'),0) AS remaining,
+--        i.payment_status
+-- FROM public.invoices i LEFT JOIN public.payments p ON p.invoice_id=i.id
+-- GROUP BY i.id ORDER BY i.invoice_number;
 
 -- ---------------------------------------------------------------------
 -- PEMERIKSAAN HASIL SEED (jalankan terpisah setelah seed berhasil)
