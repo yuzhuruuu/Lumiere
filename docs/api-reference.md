@@ -178,8 +178,18 @@ Untuk admin, tambahkan `"customer_id": "uuid-profil-pelanggan"` ke body di atas.
 | Method | Path | Keterangan |
 |---|---|---|
 | GET | `/api/reservations` | Reservasi milik sendiri (staf/admin: semua) |
-| GET | `/api/reservations/[id]` | Detail + item + `bill` + invoice + pembayaran + riwayat status + `barcode_data` untuk check-in |
+| GET | `/api/reservations/[id]` | Detail + item + `bill` + invoice + pembayaran + riwayat status + `barcode_data`; `display_status` berisi label turunan untuk pelanggan |
 | PATCH | `/api/reservations/[id]/cancel` | Batalkan reservasi sendiri (`menunggu_validasi`/`dikonfirmasi`) |
+
+`display_status` pada detail adalah label turunan (PRD v0.4 4.5):
+
+```text
+Menunggu Persetujuan → Menunggu DP → Verifikasi Pembayaran → Terkonfirmasi
+```
+
+Jika bukti ditolak, label kembali ke **Menunggu DP** dengan batas bayar baru.
+Status akhir (`Ditolak`/`Dibatalkan`/`Tidak Hadir`/`Selesai`) mengambil status
+reservasi. Ini bukan status database baru.
 
 Body pembatalan (opsional):
 
