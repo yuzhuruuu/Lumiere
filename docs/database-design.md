@@ -12,6 +12,7 @@ File migration, dijalankan berurutan:
 7. `supabase/migrations/20261119000005_payment_workflow.sql`: konfigurasi rekening/QRIS, pilihan pembayaran, bukti, bucket `payment-proofs`, dan RPC pengajuan pembayaran.
 8. `supabase/migrations/20261119000006_dp_deadline_and_payment_guards.sql`: batas bayar DP, pagar check-in/selesai, pembatalan H-1, DP hangus, refund, dan RPC verifikasi pembayaran.
 9. `supabase/migrations/20261121000001_auto_no_show.sql`: no-show otomatis 30 menit setelah jam mulai, DP hangus tanpa refund, cron `expire-no-show`.
+10. `supabase/migrations/20261121000002_no_show_skip_lunas.sql`: reservasi dengan invoice `lunas` dikecualikan dari no-show otomatis.
 
 Data contoh ada di `supabase/seed.sql` (terpisah dari migration, dijalankan terakhir).
 
