@@ -103,6 +103,8 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   sudah diterima; ditahan saat ada pembayaran menunggu verifikasi.
 - DP dikembalikan lewat pencatatan refund (`settle_refund(...)`) atau hangus
   jika pelanggan tidak hadir.
+- No-show otomatis: reservasi `dikonfirmasi` yang lewat 30 menit dari jam mulai
+  (`no_show_grace_minutes`) menjadi `tidak_hadir`; DP hangus dan tanpa refund.
 - Role/status akun hanya bisa diubah admin; admin terakhir tidak bisa dinonaktifkan.
 - Sesuai PRD 3.3, admin juga boleh membuat reservasi **atas nama pelanggan
   terdaftar** lewat `customer_id`. Pelanggan tetap membuat reservasi untuk
@@ -122,12 +124,13 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 - `npm run build` ✅
 - `npm run lint` ✅
 - Unit test Vitest: **5 file, 41 test lulus** (`npm test`)
-- Integration test database terhadap Supabase lokal: **23/23 lulus**
+- Integration test database terhadap Supabase lokal: **24/24 lulus**
   (`npm run test:integration`)
   - reservasi + item + harga snapshot + status log
   - kapasitas, jam operasional, tanggal masa lalu, durasi/jumlah tamu
   - reservasi hari ini dengan jam sudah lewat, termasuk reschedule lewat trigger
   - admin membuat reservasi untuk pelanggan terdaftar; pelanggan ditolak memakai RPC admin
+  - `expire_no_show` tidak menyentuh reservasi yang belum lewat jam mulai
   - benturan jadwal, slot bersambung, meja berbeda, tanggal berbeda
   - dua request paralel tidak menghasilkan double booking
   - minimum order, rollback saat gagal, menu tidak tersedia, meja nonaktif

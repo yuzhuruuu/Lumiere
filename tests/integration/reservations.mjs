@@ -732,6 +732,30 @@ async function main() {
     assert.equal(result.error?.code, '42501')
   })
 
+  await test('expire_no_show tidak menyentuh reservasi yang belum lewat jam mulai', async () => {
+    const created = await createReservationForCustomer(clientAdmin, userA.id, {
+      p_reservation_date: '2099-02-21',
+      p_start_time: '19:00',
+    })
+    assertNoError(created, 'create future reservation for no-show test')
+
+    const approved = await clientAdmin.rpc('approve_reservation', {
+      p_reservation_id: created.data.id,
+    })
+    assertNoError(approved, 'approve future reservation')
+
+    const expired = await admin.rpc('expire_no_show')
+    assertNoError(expired, 'run expire_no_show')
+
+    const { data: current, error } = await admin
+      .from('reservations')
+      .select('status')
+      .eq('id', created.data.id)
+      .single()
+    assertNoError({ error }, 'read no-show test reservation')
+    assert.equal(current.status, 'dikonfirmasi')
+  })
+
   console.log('')
   const passed = results.filter((result) => result.ok).length
   console.log(`${passed}/${results.length} pengujian integrasi lulus`)
