@@ -125,7 +125,7 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
 
 - `npm run build` ✅
 - `npm run lint` ✅
-- Unit test Vitest: **5 file, 41 test lulus** (`npm test`)
+- Unit test Vitest: **6 file, 47 test lulus** (`npm test`)
 - Integration test database terhadap Supabase lokal: **24/24 lulus**
   (`npm run test:integration`)
   - reservasi + item + harga snapshot + status log
