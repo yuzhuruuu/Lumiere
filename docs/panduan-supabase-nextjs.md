@@ -39,12 +39,12 @@ Karena tim pemula, deadline 28 November, dan Vercel butuh database online, cloud
 ### 3.2 Jalankan migration
 1. Buka **SQL Editor** → New query.
 2. Salin isi `supabase/migrations/20261031000001_init_schema.sql` → **Run**.
-3. Ulangi untuk `...000002_rls_policies.sql`, `...000003_storage.sql`, `...000004_auto_cancel_cron.sql`, `...20261118000001_reservation_same_day_time_guard.sql`, `...20261119000001_admin_create_reservation_for_customer.sql`, `...20261119000005_payment_workflow.sql`, `...20261119000006_dp_deadline_and_payment_guards.sql`, lalu `...20261121000001_auto_no_show.sql`. **Urutannya harus begitu.**
+3. Ulangi untuk `...000002_rls_policies.sql`, `...000003_storage.sql`, `...000004_auto_cancel_cron.sql`, `...20261118000001_reservation_same_day_time_guard.sql`, `...20261119000001_admin_create_reservation_for_customer.sql`, `...20261119000005_payment_workflow.sql`, `...20261119000006_dp_deadline_and_payment_guards.sql`, `...20261121000001_auto_no_show.sql`, lalu `...20261121000002_no_show_skip_lunas.sql`. **Urutannya harus begitu.**
 4. Periksa di **Table Editor**: 12 tabel muncul. Di **Storage**: bucket `restaurant-assets` ada. Di SQL Editor, jalankan `SELECT * FROM cron.job;` dan pastikan ada jadwal `expire-pending-reservations`.
 
 Jika ada error merah, jangan lanjut ke file berikutnya. Salin pesan errornya lalu tanyakan. Khusus file 4: kalau `CREATE EXTENSION pg_cron` gagal, aktifkan "pg_cron" di **Database → Extensions**, lalu jalankan ulang file itu.
 
-`supabase/seed.sql` (data contoh) **bukan migration**: jalankan terakhir, setelah kesembilan file di atas, dan hanya sekali. File ini belum dibuat.
+`supabase/seed.sql` (data contoh) **bukan migration**: jalankan terakhir, setelah kesepuluh file di atas, dan hanya sekali. File ini belum dibuat.
 
 Catatan: reservasi `menunggu_validasi` yang tidak divalidasi staf dalam 30 menit akan dibatalkan otomatis. Saat menguji lewat aplikasi, validasi dulu dengan akun staf, atau set `UPDATE restaurant_profile SET pending_timeout_minutes = 0;` selama pengembangan supaya data uji tidak hilang sendiri.
 
