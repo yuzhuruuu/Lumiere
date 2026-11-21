@@ -26,6 +26,10 @@ Reservasi memakai aturan transisi status dari database:
 `menunggu_validasi → dikonfirmasi/ditolak/dibatalkan`,
 `dikonfirmasi → check_in/tidak_hadir/dibatalkan`, `check_in → selesai`.
 
+Status `tidak_hadir` juga bisa terjadi otomatis: reservasi `dikonfirmasi` yang
+lewat 30 menit dari jam mulai (`no_show_grace_minutes`) ditandai tidak hadir;
+DP hangus dan tidak ada refund.
+
 ---
 
 ## 1. Publik (tanpa login)

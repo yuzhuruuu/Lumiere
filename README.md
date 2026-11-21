@@ -149,15 +149,10 @@ proxy.js          # Refresh sesi & proteksi route
 - Vercel deploy otomatis dari `main`.
 - Setiap migration baru harus tetap dijalankan di Supabase production melalui
   SQL Editor bila Supabase GitHub integration tidak menjalankannya. Migration
-  terbaru: `20261119000005_payment_workflow.sql` dan
-  `20261119000006_dp_deadline_and_payment_guards.sql`. Ganti juga rekening/QRIS
-  dummy dari seed sebelum demo.
-- Untuk mengaktifkan auto-cancel 30 menit:
-
-```sql
-UPDATE restaurant_profile SET pending_timeout_minutes = 30 WHERE id = 1;
-```
-
+  terbaru: `20261119000005_payment_workflow.sql`,
+  `20261119000006_dp_deadline_and_payment_guards.sql`, dan
+  `20261121000001_auto_no_show.sql`. Ganti juga rekening/QRIS dummy dari seed
+  sebelum demo.
 - Pastikan bucket Storage `restaurant-assets` tersedia bila upload foto dipakai.
 
 ## Dokumentasi
