@@ -105,6 +105,8 @@ menunggu_validasi ──► dikonfirmasi ──► check_in ──► selesai
   jika pelanggan tidak hadir.
 - No-show otomatis: reservasi `dikonfirmasi` yang lewat 30 menit dari jam mulai
   (`no_show_grace_minutes`) menjadi `tidak_hadir`; DP hangus dan tanpa refund.
+  Reservasi dengan invoice `lunas` dikecualikan — tetap `dikonfirmasi` dan meja
+  terblokir sampai rentang waktunya habis.
 - Role/status akun hanya bisa diubah admin; admin terakhir tidak bisa dinonaktifkan.
 - Sesuai PRD 3.3, admin juga boleh membuat reservasi **atas nama pelanggan
   terdaftar** lewat `customer_id`. Pelanggan tetap membuat reservasi untuk

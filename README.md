@@ -150,9 +150,10 @@ proxy.js          # Refresh sesi & proteksi route
 - Setiap migration baru harus tetap dijalankan di Supabase production melalui
   SQL Editor bila Supabase GitHub integration tidak menjalankannya. Migration
   terbaru: `20261119000005_payment_workflow.sql`,
-  `20261119000006_dp_deadline_and_payment_guards.sql`, dan
-  `20261121000001_auto_no_show.sql`. Ganti juga rekening/QRIS dummy dari seed
-  sebelum demo.
+  `20261119000006_dp_deadline_and_payment_guards.sql`,
+  `20261121000001_auto_no_show.sql`, dan
+  `20261121000002_no_show_skip_lunas.sql`. Ganti juga rekening/QRIS dummy dari
+  seed sebelum demo.
 - Pastikan bucket Storage `restaurant-assets` tersedia bila upload foto dipakai.
 
 ## Dokumentasi
