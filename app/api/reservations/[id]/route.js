@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/require-role'
 import { calculateBill } from '@/lib/utils/bill'
+import { getDisplayStatus } from '@/lib/reservations/display-status'
 
 export async function GET(request, { params }) {
   const supabase = await createClient()
@@ -165,6 +166,12 @@ export async function GET(request, { params }) {
         }
     
     // 6. Format response
+    const displayStatus = getDisplayStatus({
+      status: reservation.status,
+      invoice,
+      payments,
+    })
+
     const formattedReservation = {
       id: reservation.id,
       reservation_code: reservation.reservation_code,
@@ -196,6 +203,7 @@ export async function GET(request, { params }) {
         subtotal: parseFloat(item.subtotal),
       })),
       status: reservation.status,
+      display_status: displayStatus,
       validated_at: reservation.validated_at,
       checked_in_at: reservation.checked_in_at,
       rejection_reason: reservation.rejection_reason,
